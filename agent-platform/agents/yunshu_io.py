@@ -3,6 +3,10 @@ Worker 文本协议 v4 — Yunshu I/O 循环
 PLAN → SPAWN → WAIT → REFLECT → REPLY
 """
 import subprocess, threading, time, re, os, json
+import requests
+API_BASE = "http://localhost:8001"
+# PROMPT_PATH defined above
+# os.path.expanduser("~/.hermes/profiles/banni/skills/yunshu-operations/hermes_agent_prompt.md")
 from agent_registry import get_role_prompt, get_default_timeout
 from plan_parser import PlanGraph
 from checkpoint import CheckpointManager
@@ -33,7 +37,6 @@ class ReflectState:
         self.current_round = 0
         self.passed = False
         self.fail_reason = ""
-        self._in_reflect = False
 
     @property
     def active(self): return self._in_reflect
@@ -42,15 +45,12 @@ class ReflectState:
 
     def mark_pass(self):
         self.passed = True
-        self._in_reflect = False
 
     def mark_fail(self, reason=""):
         self.current_round += 1
         self.fail_reason = reason
         if self.current_round >= self.MAX_ROUNDS:
-            self._in_reflect = False
             return "FORCE_PASS"
-        self._in_reflect = False
         return "FAIL"
 
     def get_checklist_prompt(self, children, user_message):
@@ -90,7 +90,6 @@ class YunshuCommandHandler:
         self._children_lock = threading.Lock()  # P0 修复：线程安全
         self._max_spawn = 3  # 护栏上限，PLAN 可调整
         self._absolute_max = 8
-        self._in_reflect = False
         self.reflect_state = ReflectState()
         self._checkpoint_mgr = CheckpointManager(parent_id)
 
@@ -148,9 +147,8 @@ class YunshuCommandHandler:
         role_prompt = get_role_prompt(agent)
         timeout = get_default_timeout(agent)
 
-        import requests
         r = requests.post(
-            f"http://localhost:8001/api/child-tasks/",
+            f"{API_BASE}/api/child-tasks/",
             json={"parent_id": self.parent_id, "agent_name": agent,
                   "agent_profile": agent, "task_prompt": prompt},
             timeout=10
@@ -182,7 +180,7 @@ class YunshuCommandHandler:
         threading.Thread(target=_timeout_killer, daemon=True).start()
 
         requests.patch(
-            f"http://localhost:8001/api/child-tasks/{child_id}/",
+            f"{API_BASE}/api/child-tasks/{child_id}/",
             json={"status": "RUNNING", "pid": proc.pid}, timeout=5
         )
 
@@ -193,7 +191,6 @@ class YunshuCommandHandler:
         return f"OK {child_id}"
 
     def check(self, task_id):
-        import requests
         entry = self.children.get(task_id)
         if entry:
             proc = entry["proc"]
@@ -208,7 +205,7 @@ class YunshuCommandHandler:
                     result = result.split("\n", 1)[1].strip() if "\n" in result else result
                 status = "DONE" if ret == 0 else f"FAILED({ret})"
                 requests.patch(
-                    f"http://localhost:8001/api/child-tasks/{task_id}/",
+                    f"{API_BASE}/api/child-tasks/{task_id}/",
                     json={"status": "DONE" if ret == 0 else "FAILED",
                           "result": result}, timeout=5)
                 entry["obj"]["status"] = status
@@ -222,7 +219,7 @@ class YunshuCommandHandler:
             else:
                 return f"RUNNING {task_id}"
 
-        r = requests.get(f"http://localhost:8001/api/child-tasks/{task_id}/", timeout=5)
+        r = requests.get(f"{API_BASE}/api/child-tasks/{task_id}/", timeout=5)
         if r.status_code == 404:
             return f"ERROR {task_id}: 不存在"
         data = r.json()
@@ -272,9 +269,8 @@ class YunshuCommandHandler:
     def reply(self, markdown):
         if not markdown or not markdown.strip():
             return "ERROR 回复不能为空"
-        import requests
         requests.patch(
-            f"http://localhost:8001/api/parent-tasks/{self.parent_id}/",
+            f"{API_BASE}/api/parent-tasks/{self.parent_id}/",
             json={"status": "REPLY", "final_reply": markdown.strip()}, timeout=10
         )
         return None
@@ -295,8 +291,7 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
     handler = YunshuCommandHandler(parent_id, conv_id, agent_profile)
     system_prompt = _load_system_prompt()
 
-    import requests
-    requests.patch(f"http://localhost:8001/api/parent-tasks/{parent_id}/",
+    requests.patch(f"{API_BASE}/api/parent-tasks/{parent_id}/",
                    json={"status": "PLANNING"}, timeout=5)
 
     context = f"{system_prompt}\n\n用户消息：{user_message}"
@@ -408,9 +403,10 @@ def _hermes_q(message, profile):
         if raw.startswith("session_id:"):
             raw = raw.split("\n", 1)[1].strip() if "\n" in raw else raw
         return raw or r.stderr.strip() or ""
-    except Exception:
+    except Exception as e:
+        import sys
+        print(f"[YunshuIO] _hermes_q error: {e}", file=sys.stderr)
         return ""
-
 
 def _load_system_prompt():
     path = os.path.expanduser("~/.hermes/profiles/banni/skills/yunshu-operations/hermes_agent_prompt.md")
@@ -442,9 +438,8 @@ REFLECT → REFLECT_PASS 或 REFLECT_FAIL
 def _fallback_reply(parent_id, conv_id):
     reply = "系统在处理您的请求时遇到问题，请稍后重试。"
     try:
-        import requests
         requests.patch(
-            f"http://localhost:8001/api/parent-tasks/{parent_id}/",
+            f"{API_BASE}/api/parent-tasks/{parent_id}/",
             json={"status": "FAILED", "final_reply": reply}, timeout=10
         )
     except Exception:
