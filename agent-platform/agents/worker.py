@@ -20,7 +20,7 @@ def _get_deepseek_key():
     if env_key and len(env_key) > 10:
         return env_key
     # fallback: 读 .env 文件
-    env_file = os.path.expanduser("~/.hermes/profiles/feishu-bot2/.env")
+    env_file = os.path.expanduser("~/.hermes/profiles/Banni/.env")
     if os.path.exists(env_file):
         with open(env_file) as f:
             for line in f:
@@ -34,7 +34,7 @@ DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 MODEL = "deepseek-chat"
 AGENT_PLATFORM_URL = "http://localhost:8001"
 RELAY_SCRIPT = os.path.expanduser(
-    "~/.hermes/profiles/feishu-bot2/scripts/relay_feishu.py"
+    "~/.hermes/profiles/Banni/scripts/relay_feishu.py"
 )
 MAX_WORKERS = 3
 

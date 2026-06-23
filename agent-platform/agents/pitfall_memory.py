@@ -32,7 +32,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-PITFALL_FILE = os.path.expanduser("~/.hermes/profiles/feishu-bot2/pitfall_memory.json")
+PITFALL_FILE = os.path.expanduser("~/.hermes/profiles/Banni/pitfall_memory.json")
 TZ = timezone(timedelta(hours=8))
 
 

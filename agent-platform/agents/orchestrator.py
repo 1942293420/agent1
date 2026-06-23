@@ -34,7 +34,7 @@ STEP_TIMEOUT = 120  # 单步超时（秒）
 MAX_RECOVERY_LLM_CALLS = 2  # 最多调几次 LLM 修复
 
 def _get_deepseek_key():
-    env_path = os.path.expanduser("~/.hermes/profiles/feishu-bot2/.env")
+    env_path = os.path.expanduser("~/.hermes/profiles/Banni/.env")
     if os.path.exists(env_path):
         for line in open(env_path):
             if line.startswith("DEEPSEEK_API_KEY="):
@@ -79,7 +79,7 @@ class ExecutionPlan:
 # Phase 1: PlanGen — LLM 自由探索 + 输出计划（仿 Hermes agent loop）
 # ═══════════════════════════════════════════════════
 
-HERMES_STYLE_PROMPT = """你是小温，范先生的多 Agent 云枢。你有终端、代码搜索、文件读取等工具。
+HERMES_STYLE_PROMPT = """你是小温，范先生的多 Agent 豆角云枢。你有终端、代码搜索、文件读取等工具。
 
 ## 工作方式
 用户给你任务后，直接用工具开始工作。边探索边分析，结束后用中文汇报结果。

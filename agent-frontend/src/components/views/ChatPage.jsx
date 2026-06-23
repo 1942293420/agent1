@@ -44,7 +44,10 @@ export default function ChatPage() {
   const [newTitle, setNewTitle] = useState('');
   const [showSidebar, setShowSidebar] = useState(true);
   const [copiedId, setCopiedId] = useState(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEnd = useRef(null);
+  const chatContainer = useRef(null);
+  const scrollPositions = useRef({});
 
   useEffect(() => {
     (async () => {
@@ -60,30 +63,124 @@ export default function ChatPage() {
     })();
   }, []);
 
+  const isNearBottom = () => {
+    const el = chatContainer.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+  const getDistanceFromBottom = () => {
+    const el = chatContainer.current;
+    if (!el) return 0;
+    return el.scrollHeight - el.scrollTop - el.clientHeight;
+  };
+
+  const saveScrollPosition = (convId) => {
+    if (!convId || !chatContainer.current) return;
+    scrollPositions.current[convId] = {
+      top: chatContainer.current.scrollTop,
+      distFromBottom: getDistanceFromBottom(),
+      wasAtBottom: isNearBottom(),
+    };
+  };
+
+  const restoreScrollPosition = (convId) => {
+    const el = chatContainer.current;
+    if (!el) return;
+    const saved = scrollPositions.current[convId];
+    if (!saved) {
+      messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+      return;
+    }
+    if (saved.wasAtBottom) {
+      messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    } else {
+      el.scrollTop = Math.max(0, el.scrollHeight - saved.distFromBottom);
+    }
+  };
+
+  // SSE 实时事件流
+  const esRef = useRef(null);
+  const switchingRef = useRef(false);
+  const userScrolledUp = useRef(false);
+
+  useEffect(() => {
+    if (!activeConv) return;
+    const convId = activeConv; // ⭐ 闭包捕获，cleanup 时不变
+    let cancelled = false;
+    switchingRef.current = true;
+
+    (async () => {
+      try {
+        const data = await api.get('/conversations/' + convId + '/');
+        if (!cancelled) setMessages(data.messages || []);
+      } catch {}
+    })();
+
+    const es = new EventSource('/api/events/?conversation_id=' + convId);
+    esRef.current = es;
+
+    es.addEventListener('message-update', (e) => {
+      try {
+        const evt = JSON.parse(e.data);
+        if (evt.conversation_id !== convId) return;
+        api.get('/conversations/' + convId + '/').then(data => {
+          if (!cancelled && data.messages) {
+            setMessages(prev => data.messages.length !== prev.length ? data.messages : prev);
+          }
+        }).catch(() => {});
+      } catch {}
+    });
+
+    es.onerror = () => {};
+
+    return () => {
+      // ⭐ 用闭包 convId 保存，不受 activeConv 新值影响
+      saveScrollPosition(convId);
+      cancelled = true;
+      es.close();
+      esRef.current = null;
+    };
+  }, [activeConv]);
+
+  // 消息加载后恢复滚动位置（双层 RAF 等布局稳定）
+  const prevMsgLen = useRef(0);
+  const rafRef = useRef(null);
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (messages.length !== prevMsgLen.current || switchingRef.current) {
+      prevMsgLen.current = messages.length;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          restoreScrollPosition(activeConv);
+          switchingRef.current = false;
+        });
+      });
+    }
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [messages, activeConv]);
+
+  // 首次加载自动选第一个对话
   useEffect(() => {
     if (!loading && conversations.length > 0 && !activeConv) {
       setActiveConv(conversations[0].id);
     }
   }, [loading, conversations, activeConv]);
 
+  // 消息更新时智能滚动（仅当用户未主动上滚 + 非切换中）
   useEffect(() => {
-    if (!activeConv) return;
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const data = await api.get('/conversations/' + activeConv + '/');
-        if (cancelled) return;
-        setMessages(data.messages || []);
-      } catch {}
-    };
-    poll();
-    const i = setInterval(poll, 2000);
-    return () => { cancelled = true; clearInterval(i); };
-  }, [activeConv]);
-
-  useEffect(() => {
-    messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    if (messages.length > 0 && !switchingRef.current && !userScrolledUp.current) {
+      messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    }
+    setShowScrollBtn(userScrolledUp.current);
   }, [messages]);
+
+  const handleConvClick = (convId) => {
+    if (activeConv && activeConv !== convId) {
+      saveScrollPosition(activeConv); // 同步保存（第一层保险）
+    }
+    setActiveConv(convId);
+  };
 
   const createConv = async () => {
     if (!newAgentId) return;
@@ -105,8 +202,11 @@ export default function ChatPage() {
     setInput('');
     try {
       await api.post('/messages/', { conversation: activeConv, role: 'user', content: text });
+      userScrolledUp.current = false;
       const data = await api.get('/conversations/' + activeConv + '/');
       setMessages(data.messages || []);
+      // 发送后强制滚到底部
+      setTimeout(() => messagesEnd.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (e) { console.error(e); }
     finally { setSending(false); }
   };
@@ -168,21 +268,39 @@ export default function ChatPage() {
         </div>
         {/* Conv list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {conversations.map(c => (
-            <div key={c.id} onClick={() => setActiveConv(c.id)}
+          {conversations.map(c => {
+            const isProcessing = c.last_message && c.last_message.role !== 'agent';
+            const isActive = activeConv === c.id;
+            return (
+            <div key={c.id} onClick={() => handleConvClick(c.id)}
               style={{
                 padding: '12px 16px', cursor: 'pointer',
-                background: activeConv === c.id ? 'var(--bg-active)' : 'transparent',
-                borderLeft: activeConv === c.id ? '2px solid var(--cyan)' : '2px solid transparent',
+                background: isActive
+                  ? 'var(--bg-active)'
+                  : isProcessing
+                    ? 'rgba(51, 112, 255, 0.08)'
+                    : 'transparent',
+                borderLeft: isActive
+                  ? '2px solid var(--cyan)'
+                  : isProcessing
+                    ? '2px solid #3370ff'
+                    : '2px solid transparent',
                 transition: 'all 0.15s',
               }}>
-              <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{c.title}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                {isProcessing && <span style={{
+                  width: 6, height: 6, borderRadius: '50%', background: '#3370ff',
+                  flexShrink: 0, animation: 'pulse 1.5s ease-in-out infinite'
+                }} />}
+                <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</div>
+              </div>
               <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>
                 {c.agent_name || '未指定'} · {c.message_count || 0} 条
                 {c.feishu_chat_id ? ' · 💬' : ''}
+                {isProcessing ? ' · ⏳ 处理中' : ''}
               </div>
             </div>
-          ))}
+          )})}
         </div>
         {/* Footer */}
         <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
@@ -212,7 +330,16 @@ export default function ChatPage() {
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 8%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div ref={chatContainer}
+              onScroll={() => {
+                const nearBottom = isNearBottom();
+                setShowScrollBtn(!nearBottom);
+                userScrolledUp.current = !nearBottom;
+                if (!switchingRef.current && activeConv) {
+                  saveScrollPosition(activeConv);
+                }
+              }}
+              style={{ flex: 1, overflowY: 'auto', padding: '16px 8%', display: 'flex', flexDirection: 'column', gap: 8, position: 'relative' }}>
               {messages.map(msg => {
                 if (isOrchNode(msg)) {
                   const meta = getOrchMeta(msg);
@@ -257,6 +384,19 @@ export default function ChatPage() {
                 );
               })}
               <div ref={messagesEnd} />
+              {/* 回到底部按钮 */}
+              {showScrollBtn && (
+                <button onClick={() => { messagesEnd.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                  style={{
+                    position: 'sticky', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'var(--cyan)', color: '#080c14', border: 'none',
+                    cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 2px 8px rgba(0,212,255,0.3)', zIndex: 10, opacity: 0.9,
+                  }}>
+                  ↓
+                </button>
+              )}
             </div>
 
             {/* Input */}

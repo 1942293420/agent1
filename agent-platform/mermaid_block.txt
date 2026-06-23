@@ -16,8 +16,8 @@ flowchart TB
         PULL["BRPOP 拉取 msg_id"]
         FETCH["GET /api/messages/pending/\n获取 agent 信息"]
         ROUTE{"🔀 按Agent\n路由Profile"}
-        P1["-p feishu-bot2\n小温/默认"]
-        P2["-p suki\n数据分析师"]
+        P1["-p Banni\n小温/默认"]
+        P2["-p Basir\n数据分析师"]
     end
 
     subgraph Hermes引擎["Hermes 原生引擎"]

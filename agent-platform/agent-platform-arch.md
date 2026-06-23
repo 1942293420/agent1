@@ -24,8 +24,8 @@ flowchart TB
         PULL["BRPOP 拉取 msg_id"]
         FETCH["GET /api/messages/pending/\n获取 agent 信息"]
         ROUTE{"🔀 按Agent\n路由Profile"}
-        P1["-p feishu-bot2\n(小温/默认)"]
-        P2["-p suki\n(数据分析师)"]
+        P1["-p Banni\n(小温/默认)"]
+        P2["-p Basir\n(数据分析师)"]
         PX["-p &lt;custom&gt;\n(自定义Agent)"]
     end
 
@@ -113,7 +113,7 @@ redis.brpop("msg_queue", timeout=5) → (key, msg_id)
     ├─ agent_id          — 会话关联的 Agent ID
     ├─ agent_name        — Agent 名称
     ├─ agent_portrait    — Agent 人设/角色定义
-    ├─ agent_profile     — Hermes profile 名称 (feishu-bot2 | suki | ...)
+    ├─ agent_profile     — Hermes profile 名称 (Banni | Basir | ...)
     ├─ agent_model       — 模型选择 (deepseek-chat | deepseek-v4-pro)
     ├─ feishu_chat_id    — 飞书会话ID (跨平台回传用)
     ├─ source            — 来源 (web | feishu)
@@ -149,9 +149,9 @@ POST /api/messages/ → 保存 agent 回复 (processed=True, role=agent)
 
 | Agent | ID | Hermes Profile | 模型 | 核心能力 |
 |-------|-----|---------------|------|---------|
-| 飞书助手小温 | 1 | feishu-bot2 | deepseek-v4-pro | 通用助手，高效直接，中文优先 |
-| 数据分析师 | 2 | feishu-bot2 | deepseek-chat | 数据采集/清洗/分析/报告，自动化运维 |
-| 云枢 | 3 | feishu-bot2 | deepseek-chat | 任务分解，Multi-Agent 协同调度 |
+| 飞书助手小温 | 1 | Banni | deepseek-v4-pro | 通用助手，高效直接，中文优先 |
+| 数据分析师 | 2 | Banni | deepseek-chat | 数据采集/清洗/分析/报告，自动化运维 |
+| 豆角云枢 | 3 | Banni | deepseek-chat | 任务分解，Multi-Agent 协同调度 |
 
 **路由原理**：
 1. Conversation 创建时绑定 `agent_id`
@@ -418,7 +418,7 @@ KnowledgeEntry M──N Skill (knowledge_entries_related_skills)
 | API Endpoint | `https://api.deepseek.com/v1/chat/completions` |
 | 默认模型 | deepseek-chat |
 | Agent 1 模型 | deepseek-v4-pro |
-| API Key 存储 | `~/.hermes/profiles/feishu-bot2/.env` → `DEEPSEEK_API_KEY` |
+| API Key 存储 | `~/.hermes/profiles/Banni/.env` → `DEEPSEEK_API_KEY` |
 | 超时 | 600s (单轮) |
 | 温度 | 0.7 |
 | Max Tokens | 2000 |
@@ -485,8 +485,8 @@ KnowledgeEntry M──N Skill (knowledge_entries_related_skills)
 | 问题 | 影响 | 状态 |
 |------|------|------|
 | Agent persona 被 profile Memory 覆盖 | 非默认 Agent 回复仍带"小温"前缀 | 需独立 Hermes profile 以完全隔离 |
-| 多 Agent 协同仅单轮分解 | 云枢只能生成计划，无法真正 delegate | 需多轮会话+启用 delegate_task |
+| 多 Agent 协同仅单轮分解 | 豆角云枢只能生成计划，无法真正 delegate | 需多轮会话+启用 delegate_task |
 | 前端 Tailwind 类名缺失 | ChatPage 历史布局失效 | ✅ 已修复（全部改为自定义 CSS） |
-| Agent 2 豆包 API 欠费 | suki profile 返回 403 | ✅ 已改为 feishu-bot2 profile |
+| Agent 2 豆包 API 欠费 | Basir profile 返回 403 | ✅ 已改为 Banni profile |
 | 新建会话未传递 agents prop | Modal 崩溃 (agents.map undefined) | ✅ 已修复 |
 | `hermes chat` 不支持 `--system` | Portrait 注入依赖消息前缀 | 长期需支持或独立 profile |

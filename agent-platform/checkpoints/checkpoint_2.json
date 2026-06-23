@@ -1,0 +1,11 @@
+{
+  "parent_task_id": 44,
+  "stage": "EXECUTING",
+  "children_state": {
+    "52": {
+      "status": "RUNNING"
+    }
+  },
+  "yunshu_output_line": 0,
+  "summary_text": ""
+}

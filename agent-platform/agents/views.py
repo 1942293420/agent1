@@ -44,7 +44,7 @@ LLM_CONFIG = {
 
 def _build_system_prompt(agent_portrait: str = '') -> str:
     """构建注入 memory + user profile 的系统提示词，确保 Web Chat 人格与飞书小温一致"""
-    profile_dir = os.path.expanduser('~/.hermes/profiles/feishu-bot2/memories')
+    profile_dir = os.path.expanduser('~/.hermes/profiles/Banni/memories')
     parts = []
 
     # 基础人格
@@ -855,7 +855,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                 'agent_name': msg.conversation.agent.name if msg.conversation.agent else None,
                 'agent_portrait': msg.conversation.agent.portrait if msg.conversation.agent else None,
                 'agent_model': (msg.conversation.agent.config_public or {}).get('model', 'deepseek-chat') if msg.conversation.agent else 'deepseek-chat',
-                'agent_profile': (msg.conversation.agent.config_public or {}).get('profile', 'feishu-bot2') if msg.conversation.agent else 'feishu-bot2',
+                'agent_profile': (msg.conversation.agent.config_public or {}).get('profile', 'banni') if msg.conversation.agent else 'banni',
                 'created_at': msg.created_at.isoformat(),
                 'history': history,
             })
@@ -978,3 +978,115 @@ def system_workers(request):
         'pitfalls': pitfall_stats,
         'timestamp': time.time(),
     })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def system_pipeline(request):
+    """全链路状态监控：Worker → Redis → Hermes AI → 回复"""
+    import subprocess, redis as redis_lib, os, time, sqlite3
+
+    result = {
+        'worker': {},
+        'redis_queue': {},
+        'hermes_engine': {},
+        'messages': {},
+        'timestamp': time.time(),
+    }
+
+    # ── 1. Worker 状态 ──
+    try:
+        r = subprocess.run(
+            ['systemctl', '--user', 'show', 'agent-worker',
+             '--property=ActiveState,ExecMainPID,ActiveEnterTimestampMonotonic,MemoryCurrent'],
+            capture_output=True, text=True, timeout=5,
+            env={**os.environ, 'HOME': '/home/jiangli'}
+        )
+        info = {}
+        for line in r.stdout.strip().split('\n'):
+            if '=' in line:
+                k, v = line.split('=', 1)
+                info[k] = v
+        active = info.get('ActiveState', 'unknown')
+        pid = info.get('ExecMainPID', '0')
+        result['worker'] = {
+            'status': active,
+            'pid': int(pid) if pid and pid.isdigit() else 0,
+            'version': 'v4.2',
+            'concurrency': 3,
+        }
+        # 运行时长
+        mono_raw = info.get('ActiveEnterTimestampMonotonic', '')
+        if mono_raw and mono_raw.isdigit():
+            with open('/proc/uptime') as f:
+                sys_uptime = float(f.readline().split()[0])
+            boot_time = time.time() - sys_uptime
+            started_real = boot_time + int(mono_raw) / 1_000_000
+            uptime_sec = int(time.time() - started_real)
+            result['worker']['uptime_seconds'] = uptime_sec
+            result['worker']['uptime_display'] = f'{uptime_sec // 3600}h {(uptime_sec % 3600) // 60}m {uptime_sec % 60}s'
+    except Exception as e:
+        result['worker'] = {'status': 'error', 'error': str(e)}
+
+    # ── 2. Redis 队列 ──
+    try:
+        rds = redis_lib.Redis.from_url('redis://localhost:6379/0')
+        rds.ping()
+        queue_len = rds.llen('msg_queue')
+        # orchestrator 信号键
+        orch_keys = rds.keys('orch:*') or []
+        result['redis_queue'] = {
+            'status': 'connected',
+            'queue_name': 'msg_queue',
+            'queue_length': queue_len,
+            'blocked': 'waiting' if queue_len == 0 else 'processing',
+            'orch_signals': len(orch_keys),
+        }
+    except Exception as e:
+        result['redis_queue'] = {'status': 'disconnected', 'error': str(e)}
+
+    # ── 3. Hermes AI 引擎 ──
+    try:
+        ps = subprocess.run(
+            ['pgrep', '-a', 'hermes'], capture_output=True, text=True, timeout=3
+        )
+        hermes_procs = []
+        for line in ps.stdout.strip().split('\n'):
+            if line.strip():
+                hermes_procs.append(line.strip())
+        result['hermes_engine'] = {
+            'status': 'active' if hermes_procs else 'idle',
+            'active_processes': len(hermes_procs),
+            'details': hermes_procs[:5],
+        }
+    except Exception as e:
+        result['hermes_engine'] = {'status': 'unknown', 'error': str(e)}
+
+    # ── 4. 消息统计 ──
+    try:
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'db.sqlite3')
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM messages")
+        total = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM messages WHERE role='user' AND processed=1")
+        processed = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM messages WHERE role='user' AND processed=0")
+        pending = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM messages WHERE role='agent'")
+        replies = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM messages WHERE created_at > datetime('now', '-5 minutes')")
+        recent_5m = c.fetchone()[0]
+        conn.close()
+        result['messages'] = {
+            'total': total,
+            'processed': processed,
+            'pending': pending,
+            'replies': replies,
+            'last_5min': recent_5m,
+        }
+    except Exception as e:
+        result['messages'] = {'error': str(e)}
+
+    return Response(result)

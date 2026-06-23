@@ -11,7 +11,7 @@ import requests
 # ── 配置 ──
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 AGENT_PLATFORM = "http://localhost:8001"
-RELAY_SCRIPT = os.path.expanduser("~/.hermes/profiles/feishu-bot2/scripts/relay_feishu.py")
+RELAY_SCRIPT = os.path.expanduser("~/.hermes/profiles/Banni/scripts/relay_feishu.py")
 
 # DeepSeek — 通过本地 proxy（Anthropic 格式 → DeepSeek）
 PROXY_URL = "http://localhost:4000/v1/messages"

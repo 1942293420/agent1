@@ -30,7 +30,7 @@ MAX_CONCURRENT = 3
 STEP_TIMEOUT = 300  # 单步超时（秒）
 
 def _get_deepseek_key():
-    env_path = os.path.expanduser("~/.hermes/profiles/feishu-bot2/.env")
+    env_path = os.path.expanduser("~/.hermes/profiles/Banni/.env")
     if os.path.exists(env_path):
         for line in open(env_path):
             if line.startswith("DEEPSEEK_API_KEY="):
@@ -71,7 +71,7 @@ class ExecutionPlan:
 # Phase 1: PlanGen — LLM 动态生成执行计划
 # ═══════════════════════════════════════════════════
 
-PLAN_PROMPT = """你是多 Agent 系统的云枢。根据用户指令和可用 Agent 列表，生成一个执行计划。
+PLAN_PROMPT = """你是多 Agent 系统的豆角云枢。根据用户指令和可用 Agent 列表，生成一个执行计划。
 
 可用 Agent：
 {agent_list}
@@ -373,7 +373,7 @@ def _execute_step_with_tools(step: PlanStep, results: dict) -> tuple[str, str]:
 
     system_prompt = f"""{portrait}
 
-当前任务来自云枢的分配。请认真完成。用中文回复。
+当前任务来自豆角云枢的分配。请认真完成。用中文回复。
 
 {TOOL_DEFINITIONS}"""
 

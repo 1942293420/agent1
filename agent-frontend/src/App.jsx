@@ -12,6 +12,7 @@ import Settings from './components/views/Settings';
 import WorkersView from './components/views/Workers';
 import CronJobsView from './components/views/CronJobs';
 import TokensView from './components/views/Tokens';
+import MonitorView from './components/views/Monitor';
 import DetailPanel from './components/DetailPanel';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
@@ -77,7 +78,7 @@ export default function App() {
   const viewLabels = {
     dashboard:'仪表盘', tasks:'任务管理', agents:'Agent管理', skills:'Skill库',
     memory:'记忆管理', sessions:'会话中心', tokens:'Tokens', logs:'运行日志',
-    workers:'Worker', cron:'定时任务', settings:'系统设置'
+    workers:'Worker', cron:'定时任务', settings:'系统设置', monitor:'系统监控'
   };
 
   const sharedProps = { tasks, setTasks, agents, setAgents, skills, setSkills, memory, setMemory,
@@ -108,6 +109,7 @@ export default function App() {
           {view === 'workers' && <WorkersView {...sharedProps} />}
           {view === 'cron' && <CronJobsView {...sharedProps} />}
           {view === 'settings' && <Settings addToast={addToast} />}
+          {view === 'monitor' && <MonitorView />}
         </div>
       </main>
       <DetailPanel type={detailType} data={detailData} onClose={closeDetail} {...sharedProps} />

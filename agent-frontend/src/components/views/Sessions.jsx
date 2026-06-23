@@ -9,7 +9,10 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [orchProgress, setOrchProgress] = useState(null);
   const [orchState, setOrchState] = useState('idle');
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEnd = useRef(null);
+  const chatContainer = useRef(null);
+  const scrollPositions = useRef({});
 
   const activeSession = sessions.find(s => s.id === active);
 
@@ -53,9 +56,36 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
     return () => { cancelled = true; clearInterval(interval); };
   }, [active]);
 
+  // Restore scroll position when switching conversations
   useEffect(() => {
-    messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    if (!active || !chatContainer.current) return;
+    const saved = scrollPositions.current[active];
+    if (saved !== undefined) {
+      chatContainer.current.scrollTop = saved;
+    } else {
+      messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    }
+  }, [active]);
+
+  const isNearBottom = () => {
+    const el = chatContainer.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+
+  useEffect(() => {
+    if (messages.length > 0 && isNearBottom()) {
+      messagesEnd.current?.scrollIntoView({ behavior: 'instant' });
+    }
+    setShowScrollBtn(!isNearBottom());
   }, [messages]);
+
+  const handleSessionClick = (sessionId) => {
+    if (active && chatContainer.current) {
+      scrollPositions.current[active] = chatContainer.current.scrollTop;
+    }
+    setActive(sessionId);
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || !active || sending) return;
@@ -122,21 +152,37 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
         <div className="session-list-panel light">
           {sessions.length === 0 ? (
             <div style={{padding:20,textAlign:'center',color:'var(--text-muted)'}}>暂无会话</div>
-          ) : sessions.map(s => (
-            <div key={s.id} className={`session-item${active===s.id?' active':''}`} onClick={() => setActive(s.id)}>
+          ) : sessions.map(s => {
+            const isProcessing = s.last_message && s.last_message.role !== 'agent';
+            const isActive = active === s.id;
+            return (
+            <div key={s.id}
+              className={`session-item${isActive?' active':''}`}
+              onClick={() => handleSessionClick(s.id)}
+              style={isProcessing && !isActive ? {
+                background: 'rgba(51, 112, 255, 0.08)',
+                borderLeft: '2px solid #3370ff',
+              } : {}}>
               <div className="session-item-header">
-                <span className="session-name">{s.title}</span>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  {isProcessing && <span style={{
+                    width:6,height:6,borderRadius:'50%',background:'#3370ff',
+                    flexShrink:0,animation:'pulse 1.5s ease-in-out infinite'
+                  }} />}
+                  <span className="session-name">{s.title}</span>
+                </div>
                 {s.agent_name && <span className="status-badge online" style={{fontSize:9}}>{s.agent_name}</span>}
               </div>
               <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:4}}>
                 {s.created_at ? new Date(s.created_at).toLocaleString() : ''}
                 {s.feishu_chat_id ? ' · 💬飞书' : ''}
+                {isProcessing ? ' · ⏳ 处理中' : ''}
               </div>
               <div className="session-preview">
                 {s.last_message?.content?.slice(0, 60) || `${s.message_count || 0} 条消息`}
               </div>
             </div>
-          ))}
+          )})}
         </div>
 
         {/* Detail panel */}
@@ -179,7 +225,8 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
               )}
 
               {/* Messages */}
-              <div className="session-messages">
+              <div className="session-messages" ref={chatContainer}
+                onScroll={() => setShowScrollBtn(!isNearBottom())}>
                 {loadingMsgs && messages.length === 0 ? (
                   <div style={{textAlign:'center',color:'var(--text-muted)',padding:20}}>加载中...</div>
                 ) : messages.map(msg => {
@@ -206,6 +253,19 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
                   );
                 })}
                 <div ref={messagesEnd} />
+                {/* Back-to-bottom button */}
+                {showScrollBtn && (
+                  <button onClick={() => messagesEnd.current?.scrollIntoView({ behavior: 'smooth' })}
+                    style={{
+                      position: 'sticky', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: '#3370ff', color: '#fff', border: 'none',
+                      cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 8px rgba(51,112,255,0.3)', zIndex: 10, opacity: 0.9,
+                    }}>
+                    ↓
+                  </button>
+                )}
               </div>
 
               {/* Input */}

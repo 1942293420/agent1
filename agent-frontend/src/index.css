@@ -460,3 +460,9 @@ textarea.form-input{resize:vertical;min-height:80px}
   .metrics-grid{grid-template-columns:1fr}
   .view-container{padding:14px}
 }
+
+/* ─── ChatPage — processing pulse animation ─── */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

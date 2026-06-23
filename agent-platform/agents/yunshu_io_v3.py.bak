@@ -1,0 +1,360 @@
+"""
+Worker 文本协议 — Yunshu I/O 循环
+代替旧的 JSON 协议。Worker 读取 hermes stdout，匹配 6 个文本命令，执行后喂回结果。
+"""
+import subprocess, threading, time, re, os
+
+
+# ══════ 命令匹配 ══════
+CMD_PATTERNS = {
+    "SPAWN_BANNI": re.compile(r"^SPAWN_BANNI\s*:?\s*(.+)", re.I),
+    "SPAWN_BASIR": re.compile(r"^SPAWN_BASIR\s*:?\s*(.+)", re.I),
+    "CHECK":       re.compile(r"^CHECK\s+(\S+)", re.I),
+    "WAIT_ALL":    re.compile(r"^WAIT_ALL", re.I),
+    "KILL":        re.compile(r"^KILL\s+(\S+)", re.I),
+    "REPLY":       re.compile(r"^REPLY\s*:?\s*(.+)", re.I | re.S),
+}
+
+
+class YunshuCommandHandler:
+    """文本协议命令处理器。直接操作 Django ORM + subprocess。"""
+
+    def __init__(self, parent_id, conv_id, agent_profile="banni"):
+        self.parent_id = parent_id
+        self.conv_id = conv_id
+        self.profile = agent_profile
+        self.children = {}  # {task_id: {"proc": Popen, "prompt": str}}
+
+    def _guard_spawn(self):
+        """上限检查：最多 3 个活跃子任务"""
+        active = sum(1 for c in self.children.values()
+                     if c["proc"].poll() is None)
+        if active >= 3:
+            return "ERROR 已达子任务上限(最多3个)"
+        return None
+
+    # ── 6 个命令 ──
+
+    def spawn(self, agent, prompt):
+        """派发子 Agent"""
+        guard = self._guard_spawn()
+        if guard:
+            return guard
+
+        prompt = prompt.strip()
+        if not prompt:
+            return "ERROR 任务描述不能为空"
+
+        import requests
+        # 创建 child_task
+        r = requests.post(
+            f"http://localhost:8001/api/child-tasks/",
+            json={"parent_id": self.parent_id, "agent_name": agent,
+                  "agent_profile": agent, "task_prompt": prompt},
+            timeout=10
+        )
+        data = r.json()
+        child_id = data.get("id")
+        if not child_id:
+            return "ERROR 创建子任务失败"
+
+        # 启动 hermes 子进程
+        proc = subprocess.Popen(
+            ["hermes", "chat", "-q",
+             f"<system_instruction>你是{agent}，执行以下任务。直接回复结果。</system_instruction>\n{prompt}",
+             "-p", agent, "-Q", "--yolo"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            cwd=os.path.expanduser("~")
+        )
+        # 300s 超时看门狗
+        def _timeout_killer():
+            import time
+            time.sleep(300)
+            try:
+                if proc.poll() is None:
+                    proc.kill()
+            except: pass
+        t = threading.Thread(target=_timeout_killer, daemon=True)
+        t.start()
+
+        self.children[str(child_id)] = {"proc": proc, "prompt": prompt}
+
+        # 标记 RUNNING
+        requests.patch(
+            f"http://localhost:8001/api/child-tasks/{child_id}/",
+            json={"status": "RUNNING", "pid": proc.pid},
+            timeout=5
+        )
+        return f"OK {child_id}"
+
+    def check(self, task_id):
+        """查询子任务状态 + 进程存活"""
+        import requests
+
+        # 从 Worker 缓存查
+        entry = self.children.get(task_id)
+        if entry:
+            proc = entry["proc"]
+            ret = proc.poll()
+            if ret is not None:
+                # 进程已退出，补标记
+                stdout = proc.stdout.read() if proc.stdout else ""
+                stderr = proc.stderr.read() if proc.stderr else ""
+                result = stdout.strip() or stderr.strip() or "(无输出)"
+                if result.startswith("session_id:"):
+                    result = result.split("\n", 1)[1].strip() if "\n" in result else result
+                if ret == 0:
+                    requests.patch(
+                        f"http://localhost:8001/api/child-tasks/{task_id}/",
+                        json={"status": "DONE", "result": result}, timeout=5)
+                    return f"DONE {task_id}: {result[:500]}"
+                else:
+                    requests.patch(
+                        f"http://localhost:8001/api/child-tasks/{task_id}/",
+                        json={"status": "FAILED", "error_info": {"exit_code": ret}}, timeout=5)
+                    return f"FAILED {task_id}: exit_code={ret}"
+            else:
+                return f"RUNNING {task_id}: 进程运行中"
+
+        # 从 API 查
+        r = requests.get(
+            f"http://localhost:8001/api/child-tasks/{task_id}/",
+            timeout=5
+        )
+        if r.status_code == 404:
+            return f"ERROR {task_id}: 不存在"
+        data = r.json()
+        status = data.get("status", "UNKNOWN")
+        result = data.get("result", "") or ""
+        return f"{status} {task_id}: {result[:300]}"
+
+    def wait_all(self):
+        """阻塞等待所有子任务完成（最多 600s）"""
+        deadline = time.time() + 600
+        while time.time() < deadline:
+            all_done = True
+            for tid, entry in list(self.children.items()):
+                if entry["proc"].poll() is None:
+                    all_done = False
+                    break
+            if all_done:
+                break
+            time.sleep(2)
+
+        lines = []
+        for tid, entry in self.children.items():
+            proc = entry["proc"]
+            stdout = (proc.stdout.read() if proc.stdout else "") if proc.poll() is not None else ""
+            stderr = (proc.stderr.read() if proc.stderr else "") if proc.poll() is not None else ""
+            result = stdout.strip() or stderr.strip() or "(无输出)"
+            if result.startswith("session_id:"):
+                result = result.split("\n", 1)[1].strip() if "\n" in result else result
+            status = "DONE" if proc.poll() == 0 else f"FAILED({proc.poll()})"
+            lines.append(f"{status} {tid}: {result[:1000]}")
+
+        return "\n\n".join(lines) if lines else "无子任务"
+
+    def kill(self, task_id):
+        """终止子任务"""
+        entry = self.children.get(task_id)
+        if entry:
+            try:
+                entry["proc"].kill()
+            except Exception:
+                pass
+            import requests
+            requests.patch(
+                f"http://localhost:8001/api/child-tasks/{task_id}/",
+                json={"status": "FAILED", "error_info": {"type": "KILLED_BY_YUNSHU"}},
+                timeout=5
+            )
+            return f"KILLED {task_id}"
+        return f"ERROR {task_id}: 不存在"
+
+    def reply(self, markdown):
+        """最终回复"""
+        if not markdown or not markdown.strip():
+            return "ERROR 回复内容不能为空"
+        import requests
+        requests.patch(
+            f"http://localhost:8001/api/parent-tasks/{self.parent_id}/",
+            json={"status": "REPLY", "final_reply": markdown.strip()},
+            timeout=10
+        )
+        return None  # 结束信号
+
+    def _cleanup(self):
+        """清理所有子进程"""
+        for entry in self.children.values():
+            try:
+                if entry["proc"].poll() is None:
+                    entry["proc"].kill()
+            except Exception:
+                pass
+        self.children.clear()
+
+
+def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
+    """
+    多轮文本协议：用 hermes chat -q 逐轮对话。
+    每轮：Worker 喂上下文 + hermes 输出命令 → Worker 执行 → 喂结果 → 下一轮
+    """
+    handler = YunshuCommandHandler(parent_id, conv_id, agent_profile)
+    system_prompt = _load_system_prompt()
+
+    import requests
+    requests.patch(
+        f"http://localhost:8001/api/parent-tasks/{parent_id}/",
+        json={"status": "PLANNING"}, timeout=5
+    )
+
+    context = f"{system_prompt}\n\n用户消息：{user_message}"
+    max_rounds = 10
+
+    for round_n in range(max_rounds):
+        # 调用 hermes（单轮）
+        reply = _hermes_q(context, agent_profile)
+        import sys; print(f"[YunshuIO] Round {round_n}: {reply[:200]}", file=sys.stderr)
+
+        if not reply:
+            break
+
+        # 解析命令
+        lines = reply.strip().split("\n")
+        response_lines = []
+        any_command_matched = False
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            matched = False
+            for cmd_name, pattern in CMD_PATTERNS.items():
+                m = pattern.match(line)
+                if m:
+                    matched = True
+                    any_command_matched = True
+                    response = None
+                    if cmd_name == "SPAWN_BANNI":
+                        response = handler.spawn("banni", m.group(1))
+                    elif cmd_name == "SPAWN_BASIR":
+                        response = handler.spawn("basir", m.group(1))
+                    elif cmd_name == "CHECK":
+                        response = handler.check(m.group(1))
+                    elif cmd_name == "WAIT_ALL":
+                        response = handler.wait_all()
+                    elif cmd_name == "KILL":
+                        response = handler.kill(m.group(1))
+                    elif cmd_name == "REPLY":
+                        final = m.group(1).strip()
+                        handler.reply(final)
+                        handler._cleanup()
+                        return final
+
+                    if response:
+                        response_lines.append(response)
+                    break
+
+            if not matched:
+                response_lines.append(f"[YUNSHU] {line}")
+
+        # 兜底：如果没有任何命令匹配 → 整段当 REPLY
+        if not any_command_matched:
+            handler.reply(reply.strip())
+            handler._cleanup()
+            return reply.strip()
+
+        # 构建下一轮上下文
+        if response_lines:
+            # ⭐ SPAWN 之后自动 WAIT_ALL，确保子任务完成
+            if any("OK" in r for r in response_lines):
+                wait_result = handler.wait_all()
+                context = f"{system_prompt}\n\n子任务结果：\n{wait_result}"
+            else:
+                context = f"{system_prompt}\n\n上轮结果：\n" + "\n".join(response_lines)
+        else:
+            break
+
+    # 兜底
+    handler._cleanup()
+    return _fallback_reply(parent_id, conv_id)
+
+
+def _hermes_q(message, profile):
+    """单次 hermes chat -q 调用"""
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["hermes", "chat", "-q", message, "-p", profile, "-Q", "--yolo"],
+            capture_output=True, text=True, timeout=300,
+            cwd=os.path.expanduser("~")
+        )
+        raw = r.stdout.strip()
+        if raw.startswith("session_id:"):
+            raw = raw.split("\n", 1)[1].strip() if "\n" in raw else raw
+        return raw or r.stderr.strip() or ""
+    except Exception:
+        return ""
+
+
+def _load_system_prompt():
+    """加载云枢 system prompt"""
+    path = os.path.expanduser("~/.hermes/profiles/banni/skills/yunshu-operations/hermes_agent_prompt.md")
+    try:
+        return open(path).read()
+    except Exception:
+        return _default_prompt()
+
+
+def _default_prompt():
+    return """# 云枢调度器
+
+你有两个子 Agent：Banni(工程/搜索)、Basir(分析/报告)。
+
+## 命令（每行一个）
+
+SPAWN_BANNI: <任务>  → 派 Banni
+SPAWN_BASIR: <任务>  → 派 Basir
+CHECK <id>           → 查状态
+WAIT_ALL             → 等全部完成
+KILL <id>            → 终止子任务
+REPLY: <markdown>    → 回复用户（最后一条命令）
+
+## 规则
+1. 先派任务，再 WAIT_ALL 等结果
+2. 结果有误→用正确关键词重新 SPAWN
+3. 最后用 REPLY 汇总回复
+4. 不要写多余文字，只输出命令"""
+
+
+def _safety_net(handler, total_timeout=1800):
+    """安全网：独立线程监控所有子进程"""
+    deadline = time.time() + total_timeout
+    while time.time() < deadline:
+        for tid, entry in list(handler.children.items()):
+            proc = entry["proc"]
+            if proc.poll() is not None:
+                # 进程已退出但可能没被云枢 CHECK 过
+                pass
+        time.sleep(5)
+
+    # 超时兜底
+    try:
+        handler._cleanup()
+    except Exception:
+        pass
+
+
+def _fallback_reply(parent_id, conv_id):
+    """兜底回复"""
+    reply = "系统在处理您的请求时遇到问题，请稍后重试。"
+    try:
+        import requests
+        requests.patch(
+            f"http://localhost:8001/api/parent-tasks/{parent_id}/",
+            json={"status": "FAILED", "final_reply": reply}, timeout=10
+        )
+    except Exception:
+        pass
+    return reply

@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 const SYS_ITEMS = [
   { key:'workers', label:'Worker', shortLabel:'WORK', icon: <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.5"/></svg> },
   { key:'cron', label:'定时任务', shortLabel:'CRON', icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M10 5v5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
+  { key:'monitor', label:'系统监控', shortLabel:'MON', icon: <svg viewBox="0 0 20 20" fill="none"><path d="M2 15h3l2-8 3 6 2-4 3 10 1-4h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg> },
   { key:'logs', label:'运行日志', shortLabel:'LOGS', icon: <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M7 7h6M7 10h4M7 13h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
   { key:'settings', label:'系统设置', shortLabel:'CONF', icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
 ];

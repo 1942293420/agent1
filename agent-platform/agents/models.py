@@ -587,7 +587,128 @@ class Message(models.Model):
         db_table = 'messages'
         verbose_name = '消息'
         verbose_name_plural = verbose_name
+
+
+# ═══════════════════════════════════════════════
+# 多Agent协同 — 任务状态机（Phase 1）
+# ═══════════════════════════════════════════════
+
+class ParentTask(models.Model):
+    """一次用户请求 = 一个父任务"""
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', '等待云枢分析'
+        PLANNING = 'PLANNING', '云枢拆解中'
+        DISPATCHED = 'DISPATCHED', '子任务执行中'
+        EVALUATING = 'EVALUATING', '云枢评估中'
+        REPLY = 'REPLY', '已回复'
+        FAILED = 'FAILED', '失败'
+
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name='parent_tasks')
+    user_message = models.TextField(help_text='用户原始消息')
+    source = models.CharField(max_length=16, choices=[('feishu','飞书'),('web','Web')], default='web')
+    status = models.CharField(max_length=16, choices=Status.choices, default='PENDING', db_index=True)
+    dispatch_plan = models.JSONField(null=True, blank=True, help_text='云枢调度计划')
+    final_reply = models.TextField(null=True, blank=True)
+    yunshu_context = models.JSONField(default=list, blank=True, help_text='云枢历次评估上下文')
+    yunshu_call_count = models.IntegerField(default=0)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'parent_tasks'
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+        ]
+
+
+class ChildTask(models.Model):
+    """一个子Agent的一次执行"""
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', '待启动'
+        RUNNING = 'RUNNING', '执行中'
+        DONE = 'DONE', '完成'
+        FAILED = 'FAILED', '失败'
+        TIMED_OUT = 'TIMED_OUT', '超时'
+
+    parent = models.ForeignKey(
+        ParentTask, on_delete=models.CASCADE, related_name='children')
+    agent_name = models.CharField(max_length=32, help_text="banni | basir")
+    agent_profile = models.CharField(max_length=64, help_text="Hermes profile name")
+    task_prompt = models.TextField(help_text='子任务描述')
+    status = models.CharField(max_length=16, choices=Status.choices, default='PENDING', db_index=True)
+    pid = models.IntegerField(null=True, blank=True, help_text='系统进程ID')
+    hermes_session_id = models.CharField(max_length=128, null=True, blank=True)
+    result = models.TextField(null=True, blank=True)
+    error_info = models.JSONField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True, help_text='最后心跳时间')
+    retry_count = models.IntegerField(default=0)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.FloatField(null=True, blank=True, help_text='子任务完成时间戳')
+    source_marker = models.CharField(max_length=100, null=True, blank=True, help_text='来源标记，如 task_1 (Banni)')
+    tokens_used = models.IntegerField(null=True, blank=True, help_text='消耗的 token 数（估算）')
+    dependencies = models.JSONField(null=True, blank=True, help_text='依赖的其他子任务ID列表')
+    is_correction = models.BooleanField(default=False, help_text='是否为 REFLECT FAIL 后的修正轮次')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'child_tasks'
+        indexes = [
+            models.Index(fields=['parent', 'status']),
+            models.Index(fields=['heartbeat_at']),
+        ]
+
+
+class ProgressEvent(models.Model):
+    """子任务进度快照"""
+    class EventType(models.TextChoices):
+        HEARTBEAT = 'heartbeat', '心跳'
+        STAGE_MARK = 'stage_mark', '阶段标记'
+        PARTIAL_OUT = 'partial_out', '部分输出'
+        TOOL_CALL = 'tool_call', '工具调用'
+        ERROR = 'error', '错误'
+        DONE_SIGNAL = 'done_signal', '完成信号'
+
+    child_task = models.ForeignKey(
+        ChildTask, on_delete=models.CASCADE, related_name='progress_events')
+    event_type = models.CharField(max_length=32, choices=EventType.choices)
+    payload = models.JSONField(default=dict, help_text='事件载荷')
+    seq = models.IntegerField(default=0, help_text='事件序号')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'progress_events'
+        indexes = [
+            models.Index(fields=['child_task', 'seq']),
+            models.Index(fields=['child_task', 'created_at']),
+        ]
         ordering = ['created_at']
 
-    def __str__(self):
-        return f'[{self.get_role_display()}] {self.content[:60]}'
+
+class Checkpoint(models.Model):
+    """Worker 检查点 — 用于崩溃恢复"""
+    class Stage(models.TextChoices):
+        PLAN_COMPLETED = 'PLAN_COMPLETED', '规划完成'
+        EXECUTING = 'EXECUTING', '执行中'
+        REFLECT_PASSED = 'REFLECT_PASSED', '反思通过'
+        CORRECTING = 'CORRECTING', '修正中'
+
+    parent_task = models.ForeignKey(
+        ParentTask, on_delete=models.CASCADE, related_name='checkpoints')
+    stage = models.CharField(max_length=32, choices=Stage.choices)
+    children_state = models.JSONField(
+        default=dict, help_text='{task_id: {status, result_ref}} 格式的子任务状态快照')
+    yunshu_output_line = models.IntegerField(default=0, help_text='Yunshu stdout 最后读取行号')
+    summary_text = models.TextField(null=True, blank=True, help_text='恢复时喂给 Yunshu 的上下文摘要')
+    is_latest = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'checkpoints'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['parent_task', '-created_at']),
+        ]

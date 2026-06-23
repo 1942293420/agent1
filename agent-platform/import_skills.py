@@ -6,7 +6,7 @@ django.setup()
 from agents.models import Skill
 
 base_dirs = [
-    '/home/jiangli/.hermes/profiles/feishu-bot2/skills',
+    '/home/jiangli/.hermes/profiles/Banni/skills',
     '/home/jiangli/.hermes/skills',
 ]
 

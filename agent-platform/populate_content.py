@@ -11,7 +11,7 @@ from agents.models import Skill
 slug_to_path = {}
 for base in [
     os.path.expanduser('~/.hermes/skills'),
-    os.path.expanduser('~/.hermes/profiles/feishu-bot2/skills'),
+    os.path.expanduser('~/.hermes/profiles/Banni/skills'),
 ]:
     if not os.path.isdir(base):
         continue
@@ -53,7 +53,7 @@ for skill in Skill.objects.all():
         found = False
         for base in [
             os.path.expanduser('~/.hermes/skills'),
-            os.path.expanduser('~/.hermes/profiles/feishu-bot2/skills'),
+            os.path.expanduser('~/.hermes/profiles/Banni/skills'),
         ]:
             pattern = os.path.join(base, '**', skill.slug, 'SKILL.md')
             matches = glob.glob(pattern, recursive=True)
