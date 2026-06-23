@@ -30,3 +30,5 @@ dist/
 *.swo
 .DS_Store
 Thumbs.db
+/blog-project-archive-20260619.tar.gz
+/recruitment-automation-plan.md
