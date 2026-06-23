@@ -1,0 +1,32 @@
+# 忽略其他项目目录
+/django-blog/
+/blog-frontend/
+/agent-frontend.old/
+
+# ====== Django ======
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.log
+*.db
+venv/
+.venv/
+env/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# ====== Node ======
+node_modules/
+dist/
+.vite/
+
+# ====== IDE / OS ======
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

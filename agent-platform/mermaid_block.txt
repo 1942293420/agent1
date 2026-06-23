@@ -1,0 +1,57 @@
+<whiteboard token="" type="mermaid">
+flowchart TB
+    subgraph 入口层["入口层"]
+        WEB["🌐 Web Chat :5174"]
+        FEISHU["📱 飞书消息"]
+        API_DIRECT["🔌 REST API"]
+    end
+
+    subgraph API层["API 层 :8001"]
+        DJANGO["Django DRF\n消息入库 + Redis LPUSH"]
+        DB[("🗄️ SQLite\ndb.sqlite3")]
+        REDIS["📮 Redis 7\nmsg_queue"]
+    end
+
+    subgraph Worker["Worker — agent-worker"]
+        PULL["BRPOP 拉取 msg_id"]
+        FETCH["GET /api/messages/pending/\n获取 agent 信息"]
+        ROUTE{"🔀 按Agent\n路由Profile"}
+        P1["-p feishu-bot2\n小温/默认"]
+        P2["-p suki\n数据分析师"]
+    end
+
+    subgraph Hermes引擎["Hermes 原生引擎"]
+        HERMES["⚕️ hermes chat -q\n单轮会话 600s超时"]
+        TOOLS["🛠️ 25+内置工具"]
+        MEMORY["🧠 Profile Memory"]
+    end
+
+    subgraph 输出层["输出层"]
+        SAVE["💾 保存回复到DB"]
+        MARK["✅ mark-processed"]
+        RELAY["📤 飞书 relay"]
+    end
+
+    WEB --> DJANGO
+    FEISHU --> DJANGO
+    API_DIRECT --> DJANGO
+    DJANGO --> DB
+    DJANGO --> REDIS
+    REDIS --> PULL
+    PULL --> FETCH
+    FETCH --> ROUTE
+    ROUTE -->|Agent 1| P1
+    ROUTE -->|Agent 2| P2
+    P1 --> HERMES
+    P2 --> HERMES
+    HERMES --> TOOLS
+    HERMES --> MEMORY
+    HERMES --> SAVE
+    SAVE --> MARK
+    SAVE --> RELAY
+
+    style DJANGO fill:#6366f1,color:#fff
+    style HERMES fill:#22c55e,color:#fff
+    style TOOLS fill:#0ea5e9,color:#fff
+    style REDIS fill:#ef4444,color:#fff
+</whiteboard>
