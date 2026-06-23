@@ -11,6 +11,7 @@ MAX_FILES = 3
 
 
 class CheckpointManager:
+    MAX_FILES = 3  # class-level constant
     def __init__(self, parent_task_id: int):
         self.parent_id = parent_task_id
         self.lock = threading.Lock()

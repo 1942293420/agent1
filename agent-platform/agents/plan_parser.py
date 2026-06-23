@@ -41,7 +41,7 @@ class PlanGraph:
         )
 
         for m in task_pattern.finditer(tasks_block.group(1)):
-            tid = m.group(1)
+            tid = m.group(1).rstrip(",")
             agent = m.group(2).lower()
             desc = m.group(3).strip().rstrip(",")
             deps_str = m.group(4) or "[]"

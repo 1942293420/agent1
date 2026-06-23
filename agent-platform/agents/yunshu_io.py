@@ -18,7 +18,7 @@ CMD_PATTERNS = {
     "SPAWN_BANNI": re.compile(r"^SPAWN_BANNI\s*:?\s*(.+)", re.I),
     "SPAWN_BASIR": re.compile(r"^SPAWN_BASIR\s*:?\s*(.+)", re.I),
     "CHECK":       re.compile(r"^CHECK\s+(\S+)", re.I),
-    "WAIT_ALL":    re.compile(r"^WAIT_ALL", re.I),
+    "WAIT_ALL":    re.compile(r"^WAIT_ALL$", re.I),
     "KILL":        re.compile(r"^KILL\s+(\S+)", re.I),
     "REPLY":       re.compile(r"^REPLY\s*:?\s*(.+)", re.I | re.S),
     # v4 新增
@@ -35,6 +35,7 @@ class ReflectState:
 
     def __init__(self):
         self.current_round = 0
+        self._in_reflect = False
         self.passed = False
         self.fail_reason = ""
 
@@ -45,10 +46,12 @@ class ReflectState:
 
     def mark_pass(self):
         self.passed = True
+        self._in_reflect = False
 
     def mark_fail(self, reason=""):
         self.current_round += 1
         self.fail_reason = reason
+        self._in_reflect = False
         if self.current_round >= self.MAX_ROUNDS:
             return "FORCE_PASS"
         return "FAIL"
