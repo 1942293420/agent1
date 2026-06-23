@@ -1,11 +1,12 @@
 """
 Django settings for agent_platform — Multi-Agent Collaboration Platform.
 """
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-agent-platform-dev-key-change-in-prod'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-change-me-in-production')
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 

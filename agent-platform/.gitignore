@@ -1,0 +1,52 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+*.manifest
+*.spec
+
+# ─── Django / 数据库 ───
+db.sqlite3
+db.sqlite3.bak*
+*.sqlite3
+*.db
+
+# ─── 环境 / 密钥 ───
+.env
+.env.*
+credentials.json
+*.pem
+
+# ─── 静态文件 ───
+staticfiles/
+static/
+
+# ─── IDE / 编辑器 ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── 系统 / 缓存 ───
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+
+# ─── 虚拟环境 ───
+venv/
+.venv/
+env/
+
+# ─── 检查点 ───
+checkpoints/
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
