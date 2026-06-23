@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import shlex
 """
 Orchestrator v2 — 高效多 Agent 调度中台
 
@@ -36,9 +37,10 @@ MAX_RECOVERY_LLM_CALLS = 2  # 最多调几次 LLM 修复
 def _get_deepseek_key():
     env_path = os.path.expanduser("~/.hermes/profiles/Banni/.env")
     if os.path.exists(env_path):
-        for line in open(env_path):
-            if line.startswith("DEEPSEEK_API_KEY="):
-                return line.split("=", 1)[1].strip().strip("'\"")
+        with open(env_path) as f:
+            for line in f:
+                if line.startswith("DEEPSEEK_API_KEY="):
+                    return line.split("=", 1)[1].strip().strip("'\"")
     return os.environ.get("DEEPSEEK_API_KEY", "")
 
 DEEPSEEK_KEY = _get_deepseek_key()
@@ -152,7 +154,7 @@ def _execute_tool_call(tool_name: str, args: dict) -> str:
         if any(d in cmd for d in ["rm -rf", "sudo", "mkfs"]):
             return "[安全拦截]"
         try:
-            r = sp.run(cmd, shell=True, capture_output=True, text=True, timeout=30,
+            r = sp.run(shlex.split(cmd), capture_output=True, text=True, timeout=30,
                        cwd="/home/jiangli", env={**os.environ, "HOME": "/home/jiangli"})
             return (r.stdout + r.stderr)[:3000] or "(无输出)"
         except sp.TimeoutExpired:
@@ -324,7 +326,7 @@ def _exec_terminal(command: str) -> tuple[bool, str]:
         return False, "[安全拦截] 危险命令被拒绝"
     try:
         result = subprocess.run(
-            command, shell=True, capture_output=True, text=True,
+            shlex.split(command), capture_output=True, text=True,
             timeout=STEP_TIMEOUT, cwd=SAFE_DIR,
             env={**os.environ, "HOME": SAFE_DIR}
         )
@@ -354,7 +356,9 @@ def _exec_read_file(path: str) -> tuple[bool, str]:
 
 def _exec_write_file(path: str, content: str) -> tuple[bool, str]:
     """写入文件（安全限制）"""
-    if not path.startswith(SAFE_DIR + "/"):
+    real_path = os.path.realpath(path)
+    safe_real = os.path.realpath(SAFE_DIR)
+    if not real_path.startswith(safe_real + os.sep):
         return False, f"[安全拦截] 只能写入 {SAFE_DIR}/ 下的文件"
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)

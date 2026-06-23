@@ -87,6 +87,7 @@ class YunshuCommandHandler:
         self.conv_id = conv_id
         self.profile = agent_profile
         self.children = {}
+        self._children_lock = threading.Lock()  # P0 修复：线程安全
         self._max_spawn = 3  # 护栏上限，PLAN 可调整
         self._absolute_max = 8
         self._in_reflect = False
@@ -167,8 +168,9 @@ class YunshuCommandHandler:
             cwd=os.path.expanduser("~")
         )
 
-        self.children[str(child_id)] = {"proc": proc, "prompt": prompt,
-                                          "obj": {"agent_name": agent, "status": "RUNNING",
+        with self._children_lock:
+            self.children[str(child_id)] = {"proc": proc, "prompt": prompt,
+            "obj": {"agent_name": agent, "status": "RUNNING",
                                                    "result": None, "error_info": None}}
 
         def _timeout_killer():
@@ -197,8 +199,11 @@ class YunshuCommandHandler:
             proc = entry["proc"]
             ret = proc.poll()
             if ret is not None:
-                stdout = proc.stdout.read() if proc.stdout else ""
-                result = stdout.strip() or "(无输出)"
+                try:
+                    out, err = proc.communicate(timeout=5)
+                    result = (out or "").strip() or (err or "").strip() or "(无输出)"
+                except Exception:
+                    result = "(输出读取超时)"
                 if result.startswith("session_id:"):
                     result = result.split("\n", 1)[1].strip() if "\n" in result else result
                 status = "DONE" if ret == 0 else f"FAILED({ret})"
@@ -240,8 +245,11 @@ class YunshuCommandHandler:
             proc = entry["proc"]
             result = ""
             if proc.poll() is not None:
-                stdout = proc.stdout.read() if proc.stdout else ""
-                result = stdout.strip() or "(无输出)"
+                try:
+                    out, err = proc.communicate(timeout=5)
+                    result = (out or "").strip() or (err or "").strip() or "(无输出)"
+                except Exception:
+                    result = "(输出读取超时)"
                 if result.startswith("session_id:"):
                     result = result.split("\n", 1)[1].strip() if "\n" in result else result
             status = "DONE" if proc.poll() == 0 else f"FAILED({proc.poll()})" if proc.poll() is not None else "RUNNING"

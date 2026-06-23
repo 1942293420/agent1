@@ -26,7 +26,7 @@ def _get_deepseek_key():
             for line in f:
                 if line.startswith("DEEPSEEK_API_KEY="):
                     return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "sk-c58625db02854c549dc6e13c0347b7f0"  # 兜底
+    raise RuntimeError("DEEPSEEK_API_KEY not found in environment or .env file")
 
 DEEPSEEK_API_KEY = _get_deepseek_key()
 # 直接调 DeepSeek API（不经过本地 proxy，避免格式翻译）

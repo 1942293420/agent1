@@ -1,9 +1,9 @@
 {
   "parent_task_id": 44,
-  "stage": "PLAN_COMPLETED",
+  "stage": "EXECUTING",
   "children_state": {
-    "t1,": {
-      "status": "PENDING"
+    "52": {
+      "status": "RUNNING"
     }
   },
   "yunshu_output_line": 0,
