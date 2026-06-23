@@ -12,25 +12,13 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Optional
 
 # ── 配置 ──
-# 读 Hermes .env 中的 DEEPSEEK_API_KEY（和 Hermes 用同一个 key）
-import subprocess
-def _get_deepseek_key():
-    """从 Hermes .env 或环境变量获取 DeepSeek API Key"""
-    env_key = os.environ.get("DEEPSEEK_API_KEY", "")
-    if env_key and len(env_key) > 10:
-        return env_key
-    # fallback: 读 .env 文件
-    env_file = os.path.expanduser("~/.hermes/profiles/Banni/.env")
-    if os.path.exists(env_file):
-        with open(env_file) as f:
-            for line in f:
-                if line.startswith("DEEPSEEK_API_KEY="):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    raise RuntimeError("DEEPSEEK_API_KEY not found in environment or .env file")
-
-DEEPSEEK_API_KEY = _get_deepseek_key()
-# 直接调 DeepSeek API（不经过本地 proxy，避免格式翻译）
+# Key 统一由 systemd Environment= 或 ~/.hermes/.env 管理，代码不读文件
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
+MODEL = "deepseek-chat"
+
+if not DEEPSEEK_API_KEY:
+    raise RuntimeError("DEEPSEEK_API_KEY not set in environment")
 MODEL = "deepseek-chat"
 AGENT_PLATFORM_URL = "http://localhost:8001"
 RELAY_SCRIPT = os.path.expanduser(
