@@ -11,7 +11,7 @@ from django.db.models import Count
 from .models import (
     CapabilityTag, Agent, Skill, AgentSkill,
     Task, ExecutionLog, KnowledgeEntry, CronExecution, CronJob,
-    Conversation, Message,
+    Conversation, Message, TaskNode,
 )
 
 
@@ -418,7 +418,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'title', 'agent', 'agent_name', 'feishu_chat_id', 'messages', 'message_count', 'last_message', 'created_at']
+        fields = ['id', 'title', 'agent', 'agent_name', 'feishu_chat_id', 'output_content', 'messages', 'message_count', 'last_message', 'created_at']
         read_only_fields = ['id', 'created_at', 'messages', 'message_count', 'last_message']
 
     def get_message_count(self, obj):
@@ -454,3 +454,45 @@ class ConversationListSerializer(serializers.ModelSerializer):
         """是否有多个来源的消息"""
         sources = obj.messages.values_list('source', flat=True).distinct()
         return len(set(sources)) > 1
+
+
+# ═══════════════════════════════════════════════
+# TaskNode — 任务节点可视化（Basir 方案）
+# ═══════════════════════════════════════════════
+
+class TaskNodeSerializer(serializers.ModelSerializer):
+    status_label = serializers.CharField(source='get_status_display', read_only=True)
+    progress_events_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskNode
+        fields = [
+            'id', 'parent_task', 'node_id', 'label', 'description',
+            'agent_name', 'action', 'depends_on',
+            'status', 'status_label',
+            'started_at', 'finished_at', 'duration_ms',
+            'is_bottleneck', 'bottleneck_reason',
+            'child_task',
+            'seq', 'metadata', 'created_at',
+            'progress_events_count',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+    def get_progress_events_count(self, obj):
+        if obj.child_task:
+            return obj.child_task.progress_events.count()
+        return 0
+
+
+class TaskGraphSerializer(serializers.Serializer):
+    """整个任务图：包含节点列表 + 依赖图 + 卡点汇总"""
+    parent_task_id = serializers.IntegerField()
+    parent_status = serializers.CharField()
+    total_nodes = serializers.IntegerField()
+    completed_nodes = serializers.IntegerField()
+    failed_nodes = serializers.IntegerField()
+    running_nodes = serializers.IntegerField()
+    pending_nodes = serializers.IntegerField()
+    bottlenecks = serializers.ListField(child=serializers.DictField())
+    nodes = TaskNodeSerializer(many=True)
+    edges = serializers.ListField(child=serializers.DictField())

@@ -21,9 +21,14 @@ urlpatterns = [
     path('system/workers/', views.system_workers, name='system-workers'),
     path('system/pipeline-status/', views.system_pipeline, name='system-pipeline'),
     # 多Agent协同 — 任务状态机
-    path('parent-tasks/', task_api.parent_task_create, name='parent-task-create'),
+    path('parent-tasks/', task_api.parent_task_list, name='parent-task-list'),
+    path('parent-tasks/list/', task_api.parent_task_list, name='parent-task-list2'),
+    path('parent-tasks/create/', task_api.parent_task_create, name='parent-task-create'),
     path('parent-tasks/<int:pk>/', task_api.parent_task_update, name='parent-task-update'),
     path('child-tasks/', task_api.child_task_create, name='child-task-create'),
     path('child-tasks/<int:pk>/', task_api.child_task_update, name='child-task-update'),
     path('child-tasks/<int:pk>/heartbeat/', task_api.child_task_heartbeat, name='child-task-heartbeat'),
+    # 任务节点可视化
+    path('parent-tasks/<int:pk>/graph/', views.parent_task_graph, name='parent-task-graph'),
+    path('parent-tasks/<int:pk>/stop/', views.stop_parent_task, name='stop-parent-task'),
 ]

@@ -30,7 +30,7 @@ class PlanGraph:
         complexity = comp_match.group(1).lower() if comp_match else "medium"
 
         # 提取 tasks 块
-        tasks_block = re.search(r"tasks:\s*\n(.*?)(?=\n\S|\Z)", text, re.DOTALL)
+        tasks_block = re.search(r"tasks:\s*\n(.*)(?=\n\S|\Z)", text, re.DOTALL)
         if not tasks_block:
             return None
 
@@ -42,7 +42,7 @@ class PlanGraph:
 
         for m in task_pattern.finditer(tasks_block.group(1)):
             tid = m.group(1).rstrip(",")
-            agent = m.group(2).lower()
+            agent = m.group(2).lower().rstrip(",")
             desc = m.group(3).strip().rstrip(",")
             deps_str = m.group(4) or "[]"
             deps = [d.strip('"\' []') for d in deps_str.strip("[]").split(",") if d.strip()]

@@ -11,5 +11,16 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <style>
+      @media(max-width:768px) {
+        html, body { overflow: auto !important; -webkit-overflow-scrolling: touch !important; height: auto !important; }
+        #root { display: block !important; min-height: auto !important; height: auto !important; }
+        .main-content { overflow: visible !important; display: block !important; height: auto !important; min-height: auto !important; }
+        .view-container { overflow: visible !important; }
+        .session-detail-panel { overflow: visible !important; }
+        .session-messages { overflow-y: visible !important; }
+        .card, .data-table { overflow: visible !important; }
+      }
+    </style>
   </body>
 </html>

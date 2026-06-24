@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import shlex
 """
 Orchestrator v2 — 高效多 Agent 调度中台
 
@@ -17,6 +16,7 @@ Token 消耗模型：
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -27,12 +27,82 @@ import requests
 
 from .pitfall_memory import search_pitfall, apply_fix, record_pitfall
 
+# ── Django ORM for TaskNode integration ──
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'agent_platform.settings')
+import django
+django.setup()
+from django.utils import timezone as django_timezone
+from agents.models import ParentTask, TaskNode
+
 # ─── 配置 ──────────────────────────────────────────
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 AGENT_PLATFORM = "http://localhost:8001"
 MAX_CONCURRENT = 3
 STEP_TIMEOUT = 120  # 单步超时（秒）
 MAX_RECOVERY_LLM_CALLS = 2  # 最多调几次 LLM 修复
+
+
+@dataclass
+class PlanStep:
+    """执行计划中的单个步骤"""
+    id: str
+    agent: str
+    action: str  # terminal, read_file, search, reason, write_file
+    command: str = ""
+    depends_on: list = field(default_factory=list)
+    output_key: str = ""
+    note: str = ""
+    expect: str = ""  # 预期输出描述
+    on_failure: str = "skip"  # skip | retry | abort
+    retry_count: int = 0
+    llm_calls: int = 0
+    duration: float = 0.0
+
+
+@dataclass
+class ExecutionPlan:
+    """完整执行计划"""
+    plan_id: str
+    summary: str
+    steps: list  # list[PlanStep]
+    conversation_id: Optional[int] = None
+    status: str = "pending"
+
+
+def _call_llm_api(messages: list, max_tokens: int = 2000, temperature: float = 0.3) -> Optional[dict]:
+    """调用 DeepSeek API，支持工具调用，返回完整响应 dict"""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if not api_key:
+        print("[Orch] DEEPSEEK_API_KEY 未设置")
+        return None
+    payload = {
+        "model": "deepseek-chat",
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    try:
+        resp = requests.post(
+            DEEPSEEK_URL,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        choice = data["choices"][0]
+        msg = choice.get("message", {})
+        return {
+            "content": msg.get("content", ""),
+            "tool_calls": msg.get("tool_calls", []),
+        }
+    except Exception as e:
+        print(f"[Orch] LLM 调用失败: {e}")
+        return None
+
 
 def _call_llm(messages: list, max_tokens: int = 2000, temperature: float = 0.3) -> Optional[str]:
     """简单文本 LLM 调用（无工具），返回文本内容"""
@@ -456,16 +526,38 @@ def _recover_step(step: PlanStep, error: str, results: dict) -> tuple[str, str]:
 # Phase 3: 计划执行引擎（依赖解析 + 并行调度）
 # ═══════════════════════════════════════════════════
 
-def execute_plan(plan: ExecutionPlan) -> dict:
+def execute_plan(plan: ExecutionPlan, parent_task_id: int = None) -> dict:
     """
     执行计划：
     1. 拓扑排序
     2. 并行执行无依赖步骤
     3. 失败时自动修复（pitfall → LLM）
+    4. 实时更新 TaskNode 状态/duration_ms
     """
     results = {}  # step_id → PlanStep (with result)
     pending = {s.id: s for s in plan.steps}
     plan.status = "running"
+
+    # ── TaskNode: PLAN → build_from_plan ──
+    if parent_task_id:
+        try:
+            pt = ParentTask.objects.get(pk=parent_task_id)
+            # 清除旧节点（如果重复执行）
+            TaskNode.objects.filter(parent_task=pt).delete()
+            for i, step in enumerate(plan.steps):
+                TaskNode.objects.create(
+                    parent_task=pt,
+                    node_id=step.id,
+                    label=step.note or step.id,
+                    description=step.note or '',
+                    agent_name=step.agent,
+                    action=step.action,
+                    depends_on=step.depends_on,
+                    seq=i + 1,
+                    status=TaskNode.NodeStatus.PENDING,
+                )
+        except Exception as e:
+            print(f"[Orchestrator] TaskNode build failed: {e}")
 
     total_llm_before = sum(s.llm_calls for s in plan.steps)
 
@@ -504,6 +596,19 @@ def execute_plan(plan: ExecutionPlan) -> dict:
             for step in ready:
                 del pending[step.id]
                 step.status = "running"
+
+                # ── TaskNode: SPAWN → 标记 RUNNING ──
+                if parent_task_id:
+                    try:
+                        TaskNode.objects.filter(
+                            parent_task_id=parent_task_id, node_id=step.id
+                        ).update(
+                            status=TaskNode.NodeStatus.RUNNING,
+                            started_at=django_timezone.now()
+                        )
+                    except Exception:
+                        pass
+
                 future = executor.submit(_execute_step, step, results)
                 futures[future] = step
 
@@ -521,6 +626,24 @@ def execute_plan(plan: ExecutionPlan) -> dict:
 
                 print(f"[Orchestrator] {step.id} → {step.status} "
                       f"({step.duration:.1f}s, LLM×{step.llm_calls})")
+
+                # ── TaskNode: CHECK → 更新状态/duration_ms ──
+                if parent_task_id:
+                    try:
+                        tn = TaskNode.objects.filter(
+                            parent_task_id=parent_task_id, node_id=step.id
+                        ).first()
+                        if tn:
+                            tn.status = {
+                                'done': TaskNode.NodeStatus.DONE,
+                                'failed': TaskNode.NodeStatus.FAILED,
+                                'skipped': TaskNode.NodeStatus.SKIPPED,
+                            }.get(step.status, TaskNode.NodeStatus.RUNNING)
+                            tn.finished_at = django_timezone.now()
+                            tn.duration_ms = int(step.duration * 1000)
+                            tn.save()
+                    except Exception as e:
+                        print(f"[Orchestrator] TaskNode update failed for {step.id}: {e}")
 
     # 统计
     total_llm_after = sum(s.llm_calls for s in plan.steps)

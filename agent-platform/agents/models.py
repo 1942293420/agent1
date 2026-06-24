@@ -543,6 +543,7 @@ class Conversation(models.Model):
         max_length=128, null=True, blank=True, db_index=True,
         help_text='飞书会话ID，用于跨平台对话关联',
     )
+    output_content = models.TextField(blank=True, default='', help_text='输出面板内容（Agent 推送的文档/报告）')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -712,3 +713,106 @@ class Checkpoint(models.Model):
         indexes = [
             models.Index(fields=['parent_task', '-created_at']),
         ]
+
+
+# ═══════════════════════════════════════════════
+# 12. TaskNode — 任务节点可视化（Basir 方案）
+# ═══════════════════════════════════════════════
+
+class TaskNode(models.Model):
+    """任务图节点：存储每个 ParentTask 的 PLAN 分解节点及其执行状态、耗时、卡点标记"""
+
+    class NodeStatus(models.TextChoices):
+        PENDING = 'pending', '等待'
+        RUNNING = 'running', '执行中'
+        DONE = 'done', '完成'
+        FAILED = 'failed', '失败'
+        SKIPPED = 'skipped', '跳过'
+        TIMED_OUT = 'timed_out', '超时'
+
+    parent_task = models.ForeignKey(
+        ParentTask, on_delete=models.CASCADE, related_name='task_nodes')
+
+    node_id = models.CharField(max_length=32, db_index=True, help_text='节点标识，如 t1/t2')
+    label = models.CharField(max_length=128, help_text='节点名称')
+    description = models.TextField(blank=True, default='', help_text='节点描述')
+    agent_name = models.CharField(max_length=64, blank=True, default='', help_text='执行的 Agent 名称')
+    action = models.CharField(max_length=32, blank=True, default='', help_text='terminal | search | reason | write_file')
+
+    # 依赖关系（前端可视化连线用）
+    depends_on = models.JSONField(default=list, blank=True, help_text='依赖的 node_id 列表')
+
+    # 状态与时间
+    status = models.CharField(
+        max_length=16, choices=NodeStatus.choices,
+        default=NodeStatus.PENDING, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    duration_ms = models.PositiveIntegerField(default=0, help_text='执行耗时（毫秒）')
+
+    # 卡点检测
+    is_bottleneck = models.BooleanField(default=False, db_index=True, help_text='是否为性能卡点')
+    bottleneck_reason = models.CharField(max_length=256, blank=True, default='', help_text='卡点原因说明')
+
+    # 关联实际的 ChildTask（如果已派发执行）
+    child_task = models.ForeignKey(
+        ChildTask, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='task_nodes')
+
+    # 元信息
+    metadata = models.JSONField(default=dict, blank=True)
+    seq = models.IntegerField(default=0, help_text='排序序号')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'task_nodes'
+        verbose_name = '任务节点'
+        verbose_name_plural = verbose_name
+        ordering = ['parent_task', 'seq']
+        indexes = [
+            models.Index(fields=['parent_task', 'status']),
+            models.Index(fields=['parent_task', 'seq']),
+        ]
+
+    def __str__(self):
+        return f'{self.node_id}: {self.label} [{self.get_status_display()}]'
+
+    @classmethod
+    def build_from_plan(cls, parent_task, plan_data: dict) -> list:
+        """从 dispatch_plan JSON 批量创建 TaskNode"""
+        nodes = plan_data.get('nodes', [])
+        created = []
+        for i, node in enumerate(nodes):
+            tn = cls.objects.create(
+                parent_task=parent_task,
+                node_id=node.get('task_id', f't{i+1}'),
+                label=node.get('description', node.get('label', f'节点{i+1}'))[:128],
+                description=node.get('description', ''),
+                agent_name=node.get('agent_type', node.get('agent', '')),
+                action=node.get('action', ''),
+                depends_on=node.get('dependencies', node.get('depends_on', [])),
+                seq=i + 1,
+                metadata=node.get('metadata', {}),
+            )
+            created.append(tn)
+        return created
+
+    def detect_bottleneck(self, threshold_percentile: float = 0.80, min_duration_ms: int = 10000):
+        """检测当前节点是否为卡点：耗时超过同 parent 下 80% 节点 或 超过 10 秒"""
+        if self.duration_ms < min_duration_ms:
+            return False
+
+        siblings = TaskNode.objects.filter(
+            parent_task=self.parent_task
+        ).exclude(id=self.id).values_list('duration_ms', flat=True)
+
+        durations = [d for d in siblings if d > 0]
+        if not durations:
+            return self.duration_ms >= min_duration_ms
+
+        durations.append(self.duration_ms)
+        durations.sort()
+        cutoff_idx = int(len(durations) * threshold_percentile)
+        threshold = durations[cutoff_idx] if cutoff_idx < len(durations) else durations[-1]
+
+        return self.duration_ms >= threshold

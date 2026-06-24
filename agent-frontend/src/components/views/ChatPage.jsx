@@ -216,7 +216,20 @@ export default function ChatPage() {
     if (msg.metadata) {
       try { const m = JSON.parse(msg.metadata); if (m.html) { const tmp = document.createElement('div'); tmp.innerHTML = m.html; text = tmp.innerText || ''; } } catch {}
     }
-    try { await navigator.clipboard.writeText(text); setCopiedId(msg.id); setTimeout(() => setCopiedId(null), 2000); } catch {}
+    // 优先 Clipboard API，HTTP 环境用 execCommand 兜底
+    if (navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(text); } catch {}
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      document.body.removeChild(ta);
+    }
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId(null), 1500);
   };
 
   const renderContent = (msg) => {
@@ -246,7 +259,7 @@ export default function ChatPage() {
   const conv = conversations.find(c => c.id === activeConv);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', position: 'fixed', inset: 0, zIndex: 100 }}>
+    <div style={{ display: 'flex', height: '100dvh', width: '100%', overflow: 'hidden', position: 'fixed', inset: 0, zIndex: 100, maxWidth: '100vw' }}>
       {/* ── Left sidebar — dark sci-fi matching global ── */}
       <div className={showSidebar ? 'chat-sidebar open' : 'chat-sidebar'}
         style={{
@@ -331,6 +344,7 @@ export default function ChatPage() {
 
             {/* Messages */}
             <div ref={chatContainer}
+              className="chat-messages-area"
               onScroll={() => {
                 const nearBottom = isNearBottom();
                 setShowScrollBtn(!nearBottom);
@@ -369,15 +383,20 @@ export default function ChatPage() {
                       borderBottomLeftRadius: isUser ? 14 : 4,
                       position: 'relative',
                     }}>
+                      <button onClick={() => copyMsg(msg)}
+                        style={{
+                          position:'absolute', top:4, right:8,
+                          fontSize:12, background:'none', border:'none', cursor:'pointer',
+                          color: isUser ? 'rgba(255,255,255,0.4)' : L.textMuted,
+                          padding:2, lineHeight:1, opacity:0.6
+                        }}>
+                        {copiedId === msg.id ? '✓' : '📋'}
+                      </button>
                       {msg.role === 'system' ? (
                         <span style={{color:L.textMuted,fontSize:12,fontStyle:'italic'}}>{msg.content}</span>
                       ) : renderContent(msg)}
                       <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6,marginTop:4}}>
                         <span style={{fontSize:10,color:isUser ? 'rgba(255,255,255,0.6)' : L.textMuted}}>{fmt(msg.created_at)}</span>
-                        <button onClick={() => copyMsg(msg)}
-                          style={{fontSize:11,background:'none',border:'none',cursor:'pointer',color:isUser ? 'rgba(255,255,255,0.5)' : L.textMuted,padding:0,lineHeight:1}}>
-                          {copiedId === msg.id ? '✓' : '📋'}
-                        </button>
                       </div>
                     </div>
                   </div>

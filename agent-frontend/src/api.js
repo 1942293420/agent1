@@ -6,6 +6,7 @@ async function request(url, options = {}) {
     ...options,
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${url}`);
+  if (res.status === 204) return null;
   return res.json();
 }
 

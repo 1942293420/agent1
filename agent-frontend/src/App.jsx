@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import Dashboard from './components/views/Dashboard';
@@ -13,6 +13,7 @@ import WorkersView from './components/views/Workers';
 import CronJobsView from './components/views/CronJobs';
 import TokensView from './components/views/Tokens';
 import MonitorView from './components/views/Monitor';
+import OutputView from './components/views/OutputView';
 import DetailPanel from './components/DetailPanel';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
@@ -21,6 +22,7 @@ import { api } from './api';
 export default function App() {
   const [view, setView] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(220);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
@@ -38,19 +40,62 @@ export default function App() {
   const [modalType, setModalType] = useState(null);
   const [modalData, setModalData] = useState(null);
 
+  // Sidebar resize
+  const sidebarDragging = useRef(false);
+  const sidebarStartX = useRef(0);
+  const sidebarStartWidth = useRef(220);
+
+  const handleSidebarResizeStart = useCallback((e) => {
+    e.preventDefault();
+    sidebarDragging.current = true;
+    sidebarStartX.current = e.clientX;
+    sidebarStartWidth.current = sidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!sidebarDragging.current) return;
+      const delta = e.clientX - sidebarStartX.current;
+      setSidebarWidth(Math.max(180, Math.min(400, sidebarStartWidth.current + delta)));
+    };
+    const onUp = () => {
+      if (sidebarDragging.current) {
+        sidebarDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
-        const [agRes, tRes, sRes, kRes, wRes, cjRes] = await Promise.all([
+        const [agRes, tRes, sRes, kRes, wRes, cjRes, ptRes] = await Promise.all([
           api.get('/agents/', { page_size: 50 }),
           api.get('/tasks/', { page_size: 100, ordering: '-created_at' }),
           api.get('/skills/', { page_size: 200 }),
           api.get('/knowledge/', { page_size: 50 }),
           api.get('/system/workers/'),
           api.get('/cron-jobs/', { page_size: 50 }),
+          api.get('/parent-tasks/'),
         ]);
         setAgents(agRes.results || agRes || []);
-        setTasks(tRes.results || tRes || []);
+        const taskList = tRes.results || tRes || [];
+        const ptList = Array.isArray(ptRes) ? ptRes : [];
+        // 把父任务合并到任务列表（在前面）
+        const merged = [
+          ...ptList.map(pt => ({ ...pt, title: pt.user_message?.slice(0,60) || '(无消息)', _type: 'parent', _pt: pt })),
+          ...taskList,
+        ];
+        setTasks(merged);
         setSkills(sRes.results || sRes || []);
         setMemory(kRes.results || kRes || []);
         setWorkers(wRes.workers || []);
@@ -94,6 +139,8 @@ export default function App() {
         collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(prev => !prev)}
         mobileOpen={mobileOpen} onMobileOpen={() => setMobileOpen(true)}
         workers={workers}
+        width={sidebarWidth}
+        onResizeStart={handleSidebarResizeStart}
       />
       <main className="main-content">
         <Topbar view={view} viewLabels={viewLabels} addToast={addToast} onMobileOpen={() => setMobileOpen(true)} />
@@ -110,6 +157,7 @@ export default function App() {
           {view === 'cron' && <CronJobsView {...sharedProps} />}
           {view === 'settings' && <Settings addToast={addToast} />}
           {view === 'monitor' && <MonitorView />}
+          {view === 'output' && <OutputView />}
         </div>
       </main>
       <DetailPanel type={detailType} data={detailData} onClose={closeDetail} {...sharedProps} />

@@ -49,6 +49,15 @@ def _build_system_prompt(agent_portrait: str = '') -> str:
 
     # 基础人格
     parts.append('你是小温，范先生的二号飞书助手。友好、高效、直接。用中文回复。')
+    parts.append('【应答机制】你必须在以下时机主动汇报：\\n'
+                '1. 收到任务时先确认：「已收到，正在处理...」\\n'
+                '2. 分步执行时每完成一步就报告进度（如：「✅ 第1步完成 — XXX，开始第2步...」）\\n'
+                '3. 遇到阻塞或需要用户决策时立即说明情况\\n'
+                '4. 全部完成后给出总结（完成了什么、结果如何、下一步建议）\\n'
+                '不要沉默执行，用户需要随时知道你在做什么。')
+    parts.append('你可以通过 AgentOS Web 前端的「输出面板」向用户展示长篇文档/报告/方案：只需在回复末尾用特殊标记\\n'
+                '【OUTPUT_PANEL】\\n...你的文档内容...\\n【/OUTPUT_PANEL】\\n'
+                '系统会自动截取标记中的 Markdown 内容推送到用户的输出面板（右侧可打开），方便用户预览和下载 .md 文件。')
 
     # 注入 USER profile（用户是谁、偏好、禁忌）
     user_file = os.path.join(profile_dir, 'USER.md')
@@ -797,6 +806,23 @@ class ConversationViewSet(viewsets.ModelViewSet):
             pass
         return Response({'state': state})
 
+    @action(detail=True, methods=['post'], url_path='set-output')
+    def set_output(self, request, pk=None):
+        """Agent 推送文档到输出面板。请求体: {content: 'markdown...'}"""
+        conversation = self.get_object()
+        content = request.data.get('content', '')
+        if not isinstance(content, str):
+            return Response({'error': 'content must be a string'}, status=400)
+        conversation.output_content = content
+        conversation.save(update_fields=['output_content'])
+        return Response({'ok': True, 'length': len(content)})
+
+    @action(detail=True, methods=['get'], url_path='get-output')
+    def get_output(self, request, pk=None):
+        """前端轮询获取输出面板内容"""
+        conversation = self.get_object()
+        return Response({'content': conversation.output_content})
+
 
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.select_related('conversation', 'task').order_by('created_at')
@@ -822,6 +848,14 @@ class MessageViewSet(viewsets.ModelViewSet):
                 r.lpush("msg_queue", message.id)
             except Exception as e:
                 print(f"[MessageViewSet] Redis push failed: {e}")
+
+        # 📄 Agent 回复中提取输出面板内容
+        if message.role == Message.Role.AGENT and '【OUTPUT_PANEL】' in message.content:
+            import re
+            m = re.search(r'【OUTPUT_PANEL】\s*\n?(.*?)\n?\s*【/OUTPUT_PANEL】', message.content, re.DOTALL)
+            if m:
+                conv.output_content = m.group(1).strip()
+                conv.save(update_fields=['output_content'])
 
     @action(detail=False, methods=['get'], url_path='pending')
     def pending_messages(self, request):
@@ -1090,3 +1124,169 @@ def system_pipeline(request):
         result['messages'] = {'error': str(e)}
 
     return Response(result)
+
+
+# ═══════════════════════════════════════════════
+# 任务节点可视化 — Task Graph API（Basir 方案）
+# ═══════════════════════════════════════════════
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def parent_task_graph(request, pk):
+    """返回父任务的完整执行图：nodes + edges + 卡点检测"""
+    from .models import ParentTask, TaskNode  # noqa: F811
+    from .serializers import TaskNodeSerializer  # noqa: F811
+
+    try:
+        pt = ParentTask.objects.prefetch_related('task_nodes').get(pk=pk)
+    except ParentTask.DoesNotExist:
+        return Response({'error': '父任务不存在'}, status=404)
+
+    nodes = pt.task_nodes.all()
+
+    # 如果没有 TaskNode 但有 dispatch_plan，从 plan 构建节点
+    if not nodes.exists() and pt.dispatch_plan:
+        plan_data = pt.dispatch_plan
+        # 尝试 PlanGraph 格式
+        if 'nodes' in plan_data:
+            TaskNode.build_from_plan(pt, plan_data)
+            nodes = pt.task_nodes.all()
+        # 尝试 orchestrator ExecutionPlan 格式
+        elif 'steps' in plan_data:
+            steps = plan_data.get('steps', [])
+            for i, step in enumerate(steps):
+                TaskNode.objects.create(
+                    parent_task=pt,
+                    node_id=step.get('id', f'step_{i+1}'),
+                    label=step.get('note', step.get('id', f'步骤{i+1}'))[:128],
+                    description=step.get('note', ''),
+                    agent_name=step.get('agent', ''),
+                    action=step.get('action', ''),
+                    depends_on=step.get('depends_on', []),
+                    seq=i + 1,
+                )
+            nodes = pt.task_nodes.all()
+
+    # 如果已有 ChildTask 执行记录，同步状态到 TaskNode
+    if pt.children.exists():
+        child_map = {ct.id: ct for ct in pt.children.all()}
+        for node in nodes:
+            if node.child_task_id and node.child_task_id in child_map:
+                ct = child_map[node.child_task_id]
+                _sync_node_from_child(node, ct)
+
+    # 卡点检测
+    all_durations = [n.duration_ms for n in nodes if n.duration_ms > 0]
+    bottleneck_threshold = 0
+    if all_durations:
+        all_durations.sort()
+        cutoff = int(len(all_durations) * 0.75)
+        bottleneck_threshold = all_durations[cutoff] if cutoff < len(all_durations) else all_durations[-1]
+    else:
+        bottleneck_threshold = 10000  # 默认 10 秒
+
+    bottlenecks = []
+    for node in nodes:
+        # 重新标记卡点
+        if node.status in ('done', 'running') and node.duration_ms >= max(bottleneck_threshold, 10000):
+            node.is_bottleneck = True
+            if not node.bottleneck_reason:
+                node.bottleneck_reason = f'耗时 {node.duration_ms // 1000}s，超过阈值 {bottleneck_threshold // 1000}s'
+        else:
+            node.is_bottleneck = False
+            node.bottleneck_reason = ''
+        # 批量保存（不逐个 save 性能更好）
+        if node.is_bottleneck:
+            bottlenecks.append({
+                'node_id': node.node_id,
+                'label': node.label,
+                'duration_ms': node.duration_ms,
+                'reason': node.bottleneck_reason,
+            })
+
+    # 批量更新卡点字段
+    TaskNode.objects.bulk_update(
+        [n for n in nodes if n.is_bottleneck or not n.is_bottleneck],
+        ['is_bottleneck', 'bottleneck_reason']
+    )
+
+    # 构建 edges（依赖关系）
+    edges = []
+    node_id_set = {n.node_id for n in nodes}
+    for node in nodes:
+        for dep in node.depends_on:
+            if dep in node_id_set:
+                edges.append({
+                    'from': dep,
+                    'to': node.node_id,
+                })
+
+    # 计数
+    statuses = {n.status for n in nodes}
+    completed_count = sum(1 for n in nodes if n.status == 'done')
+    failed_count = sum(1 for n in nodes if n.status == 'failed')
+    running_count = sum(1 for n in nodes if n.status == 'running')
+    pending_count = sum(1 for n in nodes if n.status == 'pending')
+
+    data = {
+        'parent_task_id': pt.id,
+        'parent_status': pt.status,
+        'total_nodes': len(nodes),
+        'completed_nodes': completed_count,
+        'failed_nodes': failed_count,
+        'running_nodes': running_count,
+        'pending_nodes': pending_count,
+        'bottlenecks': bottlenecks,
+        'nodes': TaskNodeSerializer(nodes, many=True).data,
+        'edges': edges,
+    }
+
+    return Response(data)
+
+
+def _sync_node_from_child(node, child_task):
+    """从 ChildTask 同步状态到 TaskNode"""
+    node.status = {
+        'PENDING': 'pending',
+        'RUNNING': 'running',
+        'DONE': 'done',
+        'FAILED': 'failed',
+        'TIMED_OUT': 'timed_out',
+    }.get(child_task.status, 'pending')
+    node.started_at = child_task.started_at
+    node.finished_at = child_task.finished_at
+    if child_task.started_at and child_task.finished_at and isinstance(child_task.finished_at, child_task.started_at.__class__):
+        delta = child_task.finished_at - child_task.started_at
+        node.duration_ms = int(delta.total_seconds() * 1000)
+    node.save()
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def stop_parent_task(request, pk):
+    """停止父任务及其所有子Agent进程"""
+    from .models import ParentTask, TaskNode
+
+    try:
+        pt = ParentTask.objects.get(pk=pk)
+    except ParentTask.DoesNotExist:
+        return Response({'error': '任务不存在'}, status=404)
+
+    # 标记父任务为 CANCELLED
+    pt.status = 'CANCELLED'
+    pt.save(update_fields=['status'])
+
+    # 标记所有关联 TaskNode
+    TaskNode.objects.filter(parent_task=pt, status__in=['pending', 'running']).update(
+        status='cancelled'
+    )
+
+    # 通过 Redis 发停止信号（如果 Worker 在运行）
+    try:
+        from redis import Redis
+        r = Redis.from_url("redis://localhost:6379/0")
+        r.set(f"stop:parent_task:{pk}", "1", ex=300)
+    except Exception:
+        pass
+
+    return Response({'ok': True, 'stopped': True})

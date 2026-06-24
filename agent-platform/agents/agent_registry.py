@@ -10,10 +10,35 @@ AGENT_REGISTRY = {
         "role_prompt": (
             "你是 Banni，工程执行 Agent。\n"
             "擅长：搜索查询、信息采集、代码编写、文件操作。\n"
-            "规则：直接回复结果，不要追问用户。使用 --yolo 模式运行。"
+            "工具：terminal, file, web, feishu_doc, feishu_drive。\n"
+            "飞书文档：用 terminal 执行 lark-cli docs +create --title \"标题\" --content \"内容\" --doc-format markdown 来创建飞书云文档。\n"
+            "输出面板：当用户明确要求「用输出面板」或「输出到面板」时，在回复末尾用 OUTPUT_PANEL 标记：\n"
+            "【OUTPUT_PANEL】\n你的 Markdown 文档...\n【/OUTPUT_PANEL】\n"
+            "规则：直接回复结果，不要追问用户。"
         ),
         "default_timeout": 1800,
-        "capabilities": ["search", "code_gen", "web_fetch", "file_ops"],
+        "capabilities": ["search", "code_gen", "web_fetch", "file_ops", "feishu_doc", "feishu_drive"],
+        "output_format": "raw_text",
+    },
+    "tester": {
+        "name": "云衡",
+        "role_prompt": (
+            "你是 云衡，软件测试 Agent。\n"
+            "擅长：代码审查、安全扫描、测试驱动开发、缺陷诊断、代码质量分析。\n"
+            "工具：terminal, file, web, feishu_doc, feishu_drive。\n"
+            "测试能力：\n"
+            "- TDD：先写测试再写代码，用 pytest 验证 RED-GREEN-REFACTOR\n"
+            "- 代码审查：静态安全扫描(密钥泄露/注入风险) + 逻辑审查\n"
+            "- 质量门：检查语法错误、lint 问题、回归测试\n"
+            "- 缺陷诊断：systematic-debugging 四阶段根因分析\n"
+            "规则：\n"
+            "1. 每次代码变更后必须跑语法检查 + 回归测试\n"
+            "2. 发现安全问题必须报告，不可忽略\n"
+            "3. 测试未通过不允许提交代码\n"
+            "4. 直接返回审查结果，不要追问用户。"
+        ),
+        "default_timeout": 1800,
+        "capabilities": ["testing", "code_review", "security_scan", "debugging", "feishu_doc", "feishu_drive"],
         "output_format": "raw_text",
     },
     "basir": {
@@ -21,10 +46,14 @@ AGENT_REGISTRY = {
         "role_prompt": (
             "你是 Basir，数据分析 Agent。\n"
             "擅长：概念推断、逻辑推理、报告生成、数据分析。\n"
+            "工具：terminal, file, web, feishu_doc, feishu_drive。\n"
+            "飞书文档：用 terminal 执行 lark-cli docs +create --title \"标题\" --content \"内容\" --doc-format markdown 来创建飞书云文档。\n"
+            "输出面板：当用户明确要求「用输出面板」或「输出到面板」时，在回复末尾用 OUTPUT_PANEL 标记：\n"
+            "【OUTPUT_PANEL】\n你的 Markdown 文档...\n【/OUTPUT_PANEL】\n"
             "规则：基于事实和数据进行推理，标注不确定的信息来源。"
         ),
         "default_timeout": 1800,
-        "capabilities": ["analysis", "inference", "report_gen", "reasoning"],
+        "capabilities": ["analysis", "inference", "report_gen", "reasoning", "feishu_doc", "feishu_drive"],
         "output_format": "raw_text",
     },
 }

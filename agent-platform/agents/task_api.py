@@ -2,9 +2,30 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from django.http import JsonResponse
 from django.utils import timezone
 
-from .models import ParentTask, ChildTask, Message
+from .models import ParentTask, ChildTask, TaskNode, Message
+
+
+@api_view(['GET'])
+def parent_task_list(request):
+    tasks = ParentTask.objects.order_by('-id')[:50]
+    data = []
+    for pt in tasks:
+        nodes = TaskNode.objects.filter(parent_task=pt)
+        data.append({
+            'id': pt.id,
+            'status': pt.status,
+            'user_message': pt.user_message or '',
+            'source': pt.source or '',
+            'node_count': nodes.count(),
+            'running_nodes': nodes.filter(status__in=['running']).count(),
+            'done_nodes': nodes.filter(status='done').count(),
+            'failed_nodes': nodes.filter(status='failed').count(),
+            'created_at': pt.created_at.isoformat() if pt.created_at else None,
+        })
+    return JsonResponse(data, safe=False)
 
 
 @api_view(['POST'])
@@ -88,6 +109,6 @@ def child_task_update(request, pk):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def child_task_heartbeat(request, pk):
-    """子进程心跳（简单版：只更新 heartbeat_at）"""
+    """子进程心跳"""
     ChildTask.objects.filter(pk=pk).update(heartbeat_at=timezone.now())
     return Response({'ok': True})

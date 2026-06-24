@@ -8,6 +8,14 @@ import redis
 
 REDIS_URL = "redis://localhost:6379/0"
 AGENT_PLATFORM = "http://localhost:8001"
+
+# Init Django so yunshu_io TaskNode tracking works
+_worker_dir = os.path.dirname(os.path.abspath(__file__))
+_project_root = os.path.dirname(_worker_dir)
+sys.path.insert(0, _project_root)
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'agent_platform.settings')
+import django; django.setup()
+
 TASK_TIMEOUT = 600
 HERMES_TIMEOUT = 600
 CHILD_TIMEOUT = 300
@@ -138,8 +146,42 @@ def process_message(msg_id):
     user_msg = target["content"]
     agent_profile = target.get("agent_profile", "banni")
 
-    # 创建父任务
-    pt = _api("parent-tasks/", 'post', {
+    # ── Agent 路由：检查对话分配的 Agent ──
+    # 如果是 云衡，直接调 hermes chat，不走云枢调度
+    try:
+        conv_resp = requests.get(
+            f"{AGENT_PLATFORM}/api/conversations/{conv_id}/", timeout=5
+        )
+        conv_agent = (conv_resp.json().get("agent_name") or "").strip()
+    except Exception:
+        conv_agent = ""
+
+    # Agent 路由：只有云枢走调度模式，其他 Agent 直接对话
+    DIRECT_AGENTS = {"云衡": "tester", "Banni": "banni", "Basir": "basir"}
+    if conv_agent in DIRECT_AGENTS:
+        profile = DIRECT_AGENTS[conv_agent]
+        print(f"[Worker] #{msg_id} → {conv_agent}(直接对话)")
+        _push_msg(conv_id, f"✅ 已收到，{conv_agent}处理中...", "received")
+        import subprocess as _sp
+        try:
+            proc = _sp.run(
+                ["hermes", "chat", "-q", user_msg,
+                 "-p", profile, "-Q", "--yolo",
+                 "-t", "terminal,file,web,feishu_doc,feishu_drive"],
+                capture_output=True, text=True, timeout=300,
+                cwd=os.path.expanduser("~")
+            )
+            reply = proc.stdout.strip()
+            if reply.startswith("session_id:"):
+                reply = reply.split("\n", 1)[1].strip() if "\n" in reply else reply
+            _save_reply(target, reply or "(无输出)")
+        except Exception as e:
+            _save_reply(target, f"{conv_agent}处理失败: {e}")
+        _mark_processed(msg_id)
+        return
+
+    # 以下是云枢调度流程
+    pt = _api("parent-tasks/create/", 'post', {
         "conversation_id": conv_id, "user_message": user_msg,
         "source": target.get("source", "web")
     })
