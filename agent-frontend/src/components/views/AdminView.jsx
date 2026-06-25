@@ -78,13 +78,13 @@ export default function AdminView({ addToast }) {
   };
   const handleReset = async () => {
     if (!resetPwd || resetPwd.length < 6) { addToast('密码至少6位'); return; }
-    try { const res = await adminFetch(`/api/admin/users/${resetModal.id}/reset-password/`, { method: 'POST', body: JSON.stringify({ password: resetPwd }) }); if (res.ok) { addToast(`已重置 ${resetModal.username}`); setResetModal(null); setResetPwd(''); } else { addToast((await res.json()).error || '失败'); } } catch (e) {}
+    try { const res = await adminFetch(`/api/admin/users/${resetModal.id}/reset-password/`, { method: 'POST', body: JSON.stringify({ password: resetPwd }) }); if (res.ok) { addToast(`已重置 ${resetModal.username}，新密码: ${resetPwd}`); setResetModal(null); setResetPwd(''); } else { addToast((await res.json()).error || '失败'); } } catch (e) {}
   };
   const handleAdd = async () => {
     if (!newUsername.trim() || !newPassword) { setAddError('用户名和密码不能为空'); return; }
     if (newPassword.length < 6) { setAddError('密码至少6位'); return; }
     setAddError('');
-    try { const res = await adminFetch('/api/admin/users/add/', { method: 'POST', body: JSON.stringify({ username: newUsername.trim(), password: newPassword }) }); if (res.ok) { addToast(`已添加 ${newUsername.trim()}`); setNewUsername(''); setNewPassword(''); setShowAdd(false); fetchUsers(); } else { setAddError((await res.json()).error || '失败'); } } catch (e) { setAddError('网络错误'); }
+    try { const res = await adminFetch('/api/admin/users/add/', { method: 'POST', body: JSON.stringify({ username: newUsername.trim(), password: newPassword }) }); if (res.ok) { addToast(`已添加 ${newUsername.trim()}，密码: ${newPassword}`); setNewUsername(''); setNewPassword(''); setShowAdd(false); fetchUsers(); } else { setAddError((await res.json()).error || '失败'); } } catch (e) { setAddError('网络错误'); }
   };
 
   const pendingCount = users.filter(u => !u.is_active).length;

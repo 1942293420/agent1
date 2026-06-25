@@ -1405,7 +1405,7 @@ def admin_reset_password(request, user_id):
         return Response({"error": "用户不存在"}, status=404)
     user.set_password(new_password)
     user.save(update_fields=["password"])
-    return Response({"ok": True, "username": user.username})
+    return Response({"ok": True, "username": user.username, "password": new_password})
 
 @csrf_exempt
 @api_view(["POST"])
@@ -1422,7 +1422,7 @@ def admin_add_user(request):
     if User.objects.filter(username=username).exists():
         return Response({"error": "用户名已被占用"}, status=409)
     user = User.objects.create_user(username=username, password=password, is_active=True)
-    return Response({"ok": True, "user": {"id": user.id, "username": user.username}}, status=201)
+    return Response({"ok": True, "user": {"id": user.id, "username": user.username}, "password": password}, status=201)
 
 
 @api_view(['DELETE', 'POST'])

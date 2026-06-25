@@ -128,10 +128,10 @@ def apply_fix(entry: dict, step_context: dict) -> tuple[bool, str]:
     fix_type = entry.get("fix_type", "retry")
 
     if fix_type == "command_fix":
-        import subprocess
+        import subprocess, shlex
         try:
             result = subprocess.run(
-                entry["fix_detail"], shell=True,
+                shlex.split(entry["fix_detail"]),
                 capture_output=True, text=True, timeout=30,
                 cwd="/home/jiangli",
                 env={**os.environ, "HOME": "/home/jiangli"}
