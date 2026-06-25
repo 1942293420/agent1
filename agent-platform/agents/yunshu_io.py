@@ -294,6 +294,11 @@ class YunshuCommandHandler:
                             if tn.started_at:
                                 delta = tn.finished_at - tn.started_at
                                 tn.duration_ms = int(delta.total_seconds() * 1000)
+                            # 保存错误/输出信息到 metadata
+                            if ret != 0:
+                                tn.metadata = {"error": result[:500], "exit_code": ret}
+                            else:
+                                tn.metadata = {"output": result[:500]}
                             tn.save()
                     except Exception as e:
                         import sys
@@ -753,9 +758,25 @@ tasks:
 def _fallback_reply(parent_id, conv_id):
     reply = "系统在处理您的请求时遇到问题，请稍后重试。"
     try:
-        requests.patch(
-            f"{API_BASE}/api/parent-tasks/{parent_id}/",
-            json={"status": "FAILED", "final_reply": reply}, timeout=10
+        # 只在任务还未完成时标记失败
+        current = requests.get(f"{API_BASE}/api/parent-tasks/{parent_id}/", timeout=5).json()
+        if current.get("status") not in ("REPLY",):
+            requests.patch(
+                f"{API_BASE}/api/parent-tasks/{parent_id}/",
+                json={"status": "FAILED", "final_reply": reply}, timeout=10
+            )
+    except Exception:
+        pass
+    # 写入会话消息
+    try:
+        requests.post(
+            f"{API_BASE}/api/messages/",
+            json={
+                "conversation": conv_id,
+                "role": "system",
+                "content": f"⚠️ 任务执行结束"
+            },
+            timeout=10
         )
     except Exception:
         pass
