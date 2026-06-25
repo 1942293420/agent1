@@ -1309,12 +1309,11 @@ def login_view(request):
 
 @csrf_exempt
 @api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
 def logout_view(request):
     """登出，清除 session"""
     logout(request)
-    resp = Response({'ok': True})
-    resp.delete_cookie('sessionid', path='/')
-    return resp
+    return Response({'ok': True})
 
 @ensure_csrf_cookie
 @api_view(['GET'])

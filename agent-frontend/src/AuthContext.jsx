@@ -36,7 +36,8 @@ export function AuthProvider({ children }) {
       headers: csrf ? { 'X-CSRFToken': csrf } : {},
       credentials: 'include',
     }).catch(() => {});
-    setUser(null);
+    // 强制跳转首页，触发全新 whoami 校验
+    window.location.href = '/';
   }, []);
 
   return (
