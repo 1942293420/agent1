@@ -50,6 +50,7 @@ function AppInner() {
   const [detailData, setDetailData] = useState(null);
   const [modalType, setModalType] = useState(null);
   const [modalData, setModalData] = useState(null);
+  const [activeSessionId, setActiveSessionId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -89,7 +90,8 @@ function AppInner() {
   const closeModal = useCallback(() => { setModalType(null); setModalData(null); }, []);
 
   const ctx = { tasks, setTasks, agents, setAgents, skills, setSkills, memory, setMemory,
-    sessions, setSessions, workers, cronJobs, loading, addToast, openDetail, openModal };
+    sessions, setSessions, workers, cronJobs, loading, addToast, openDetail, openModal,
+    activeSessionId, setActiveSessionId };
 
   return (
     <AppContext.Provider value={ctx}>

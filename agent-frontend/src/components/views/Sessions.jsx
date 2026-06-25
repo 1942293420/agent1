@@ -88,8 +88,8 @@ function useResize(defaultSize, min, max, direction) {
 }
 
 export default function Sessions() {
-  const { sessions, setSessions, agents, addToast, openModal } = useApp();
-  const [active, setActive] = useState(null);
+  const { sessions, setSessions, agents, addToast, openModal, activeSessionId, setActiveSessionId } = useApp();
+  const [active, setActive] = useState(activeSessionId);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -235,6 +235,7 @@ export default function Sessions() {
     }
     userScrolledUp.current = false;
     setActive(sessionId);
+    setActiveSessionId(sessionId);
   };
 
   const handleScroll = () => {
@@ -290,7 +291,7 @@ export default function Sessions() {
     try {
       await api.delete('/conversations/' + sessionId + '/');
       setSessions(prev => prev.filter(x => x.id !== sessionId));
-      if (active === sessionId) setActive(null);
+      if (active === sessionId) { setActive(null); setActiveSessionId(null); }
       addToast('会话已关闭', 'success');
     } catch (e) { addToast('关闭失败: ' + e.message, 'error'); }
   };
@@ -441,14 +442,14 @@ export default function Sessions() {
     <>
       <div className="view-header">
         <h1 className="view-title">会话中心</h1>
-        <div className="view-actions">
-          <button className="btn btn-primary" onClick={() => openModal('newSession')}>新建会话</button>
-        </div>
       </div>
 
       <div className="session-layout">
         {/* Session list — resizable */}
         <div className="session-list-panel light" style={{ width: listResize.size, minWidth: listResize.size, flexShrink: 0 }}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid rgba(255,255,255,0.06)',flexShrink:0}}>
+            <button className="btn btn-primary" style={{width:'100%'}} onClick={() => openModal('newSession')}>+ 新建会话</button>
+          </div>
           {sessions.length === 0 ? (
             <div style={{padding:20,textAlign:'center',color:'var(--text-muted)'}}>暂无会话</div>
           ) : sessions.map(s => {

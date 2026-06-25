@@ -924,3 +924,7 @@ textarea.form-input{resize:vertical;min-height:80px}
   .chat-sidebar{display:none}
   .chat-sidebar.open{display:flex;position:fixed;inset:52px 0 0 0;z-index:50;width:100%}
 }
+
+.session-view{display:flex;flex-direction:column;height:calc(100vh - 108px);overflow:hidden}
+.session-view .view-header{position:static;padding:12px 24px 0;flex-shrink:0}
+.session-view .session-layout{flex:1;overflow:hidden}
