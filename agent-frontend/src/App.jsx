@@ -14,13 +14,16 @@ import CronJobsView from './components/views/CronJobs';
 import TokensView from './components/views/Tokens';
 import MonitorView from './components/views/Monitor';
 import OutputView from './components/views/OutputView';
+import RealtimeDashboard from './components/views/RealtimeDashboard';
+import HomePage from './components/views/HomePage';
+import AdminView from './components/views/AdminView';
 import DetailPanel from './components/DetailPanel';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
 import { api } from './api';
 
 export default function App() {
-  const [view, setView] = useState('dashboard');
+  const [view, setView] = useState('home');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -123,7 +126,8 @@ export default function App() {
   const viewLabels = {
     dashboard:'仪表盘', tasks:'任务管理', agents:'Agent管理', skills:'Skill库',
     memory:'记忆管理', sessions:'会话中心', tokens:'Tokens', logs:'运行日志',
-    workers:'Worker', cron:'定时任务', settings:'系统设置', monitor:'系统监控'
+    workers:'Worker', cron:'定时任务', settings:'系统设置', monitor:'系统监控',
+    admin:'用户管理',
   };
 
   const sharedProps = { tasks, setTasks, agents, setAgents, skills, setSkills, memory, setMemory,
@@ -157,7 +161,10 @@ export default function App() {
           {view === 'cron' && <CronJobsView {...sharedProps} />}
           {view === 'settings' && <Settings addToast={addToast} />}
           {view === 'monitor' && <MonitorView />}
+          {view === 'admin' && <AdminView addToast={addToast} />}
           {view === 'output' && <OutputView />}
+          {view === 'realtime' && <RealtimeDashboard parentTaskId={selectedTaskId} />}
+          {view === 'home' && <HomePage />}
         </div>
       </main>
       <DetailPanel type={detailType} data={detailData} onClose={closeDetail} {...sharedProps} />

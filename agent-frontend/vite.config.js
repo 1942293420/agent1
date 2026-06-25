@@ -12,4 +12,14 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: 5174,
+    allowedHosts: ['9jqqe6009277.vicp.fun'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
+    },
+  },
 });

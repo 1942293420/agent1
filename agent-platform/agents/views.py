@@ -23,7 +23,9 @@ import requests
 from django.db import transaction
 from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
+from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework import viewsets, status, filters, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -1290,3 +1292,132 @@ def stop_parent_task(request, pk):
         pass
 
     return Response({'ok': True, 'stopped': True})
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def login_view(request):
+    username = request.data.get("username", "").strip()
+    password = request.data.get("password", "")
+    if not username or not password:
+        return Response({"error": "请输入用户名和密码"}, status=400)
+    user = authenticate(request, username=username, password=password)
+    if user is None:
+        return Response({"error": "用户名或密码错误"}, status=401)
+    login(request, user)
+    return Response({"ok": True, "user": {"id": user.id, "username": user.username, "is_staff": user.is_staff}})
+
+@csrf_exempt
+@api_view(['POST'])
+def logout_view(request):
+    """登出，清除 session"""
+    logout(request)
+    resp = Response({'ok': True})
+    resp.delete_cookie('sessionid', path='/')
+    return resp
+
+@ensure_csrf_cookie
+@api_view(['GET'])
+def whoami_view(request):
+    """验证当前登录状态"""
+    if request.user.is_authenticated:
+        return Response({
+            'authenticated': True,
+            'user': {
+                'id': request.user.id,
+                'username': request.user.username,
+                'is_staff': request.user.is_staff,
+            }
+        })
+    return Response({'authenticated': False})
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([permissions.AllowAny])
+def register_view(request):
+    from django.contrib.auth.models import User
+    username = request.data.get("username", "").strip()
+    password = request.data.get("password", "")
+    password2 = request.data.get("password2", "")
+    if not username or not password:
+        return Response({"error": "用户名和密码不能为空"}, status=400)
+    if len(username) < 3:
+        return Response({"error": "用户名至少 3 个字符"}, status=400)
+    if len(password) < 6:
+        return Response({"error": "密码至少 6 个字符"}, status=400)
+    if password != password2:
+        return Response({"error": "两次密码不一致"}, status=400)
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "用户名已被占用"}, status=409)
+    user = User.objects.create_user(username=username, password=password, is_active=False, is_staff=False)
+    return Response({"ok": True, "message": "注册成功，请等待管理员审批", "user_id": user.id}, status=201)
+
+@api_view(["GET"])
+def admin_list_users(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({"error": "无权限"}, status=403)
+    from django.contrib.auth.models import User
+    users = User.objects.all().order_by("-date_joined").values("id","username","is_active","is_staff","date_joined","last_login")
+    return Response(list(users))
+
+@csrf_exempt
+@api_view(["POST"])
+def admin_approve_user(request, user_id):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({"error": "无权限"}, status=403)
+    from django.contrib.auth.models import User
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "用户不存在"}, status=404)
+    user.is_active = True
+    user.save(update_fields=["is_active"])
+    return Response({"ok": True, "username": user.username})
+
+@csrf_exempt
+@api_view(["POST"])
+def admin_reject_user(request, user_id):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({"error": "无权限"}, status=403)
+    from django.contrib.auth.models import User
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "用户不存在"}, status=404)
+    username = user.username
+    user.delete()
+    return Response({"ok": True, "username": username})
+
+@csrf_exempt
+@api_view(["POST"])
+def admin_reset_password(request, user_id):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({"error": "无权限"}, status=403)
+    from django.contrib.auth.models import User
+    new_password = request.data.get("password", "")
+    if not new_password or len(new_password) < 6:
+        return Response({"error": "新密码至少 6 个字符"}, status=400)
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({"error": "用户不存在"}, status=404)
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+    return Response({"ok": True, "username": user.username})
+
+@csrf_exempt
+@api_view(["POST"])
+def admin_add_user(request):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({"error": "无权限"}, status=403)
+    from django.contrib.auth.models import User
+    username = request.data.get("username", "").strip()
+    password = request.data.get("password", "")
+    if not username or not password:
+        return Response({"error": "用户名和密码不能为空"}, status=400)
+    if len(password) < 6:
+        return Response({"error": "密码至少 6 个字符"}, status=400)
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "用户名已被占用"}, status=409)
+    user = User.objects.create_user(username=username, password=password, is_active=True)
+    return Response({"ok": True, "user": {"id": user.id, "username": user.username}}, status=201)

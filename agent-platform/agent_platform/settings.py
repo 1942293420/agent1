@@ -119,6 +119,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:5173',
     'http://192.168.31.99:5173',
     'http://192.168.31.99:8000',
+    'http://9jqqe6009277.vicp.fun:5174',
+    'http://9jqqe6009277.vicp.fun',
 ]
 
 # ─── 安全 ───

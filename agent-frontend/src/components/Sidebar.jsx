@@ -1,6 +1,8 @@
 import React from 'react';
+import { useAuth } from '../AuthContext';
 
 const NAV_ITEMS = [
+  { key:'home', label:'首页', shortLabel:'HOME', icon: <svg viewBox="0 0 20 20" fill="none"><path d="M3 10l7-7 7 7M5 8v8a1 1 0 001 1h8a1 1 0 001-1V8" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
   { key:'dashboard', label:'仪表盘', shortLabel:'DASH', icon: <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg> },
   { key:'agents', label:'Agent 管理', shortLabel:'AGENT', icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="7" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
   { key:'tasks', label:'任务管理', shortLabel:'TASK', icon: <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><circle cx="15" cy="15" r="3" stroke="currentColor" strokeWidth="1.5"/></svg> },
@@ -17,14 +19,21 @@ const SYS_ITEMS = [
   { key:'logs', label:'运行日志', shortLabel:'LOGS', icon: <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M7 7h6M7 10h4M7 13h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
   { key:'settings', label:'系统设置', shortLabel:'CONF', icon: <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
 ];
+const ADMIN_ICON = <svg viewBox="0 0 20 20" fill="none"><path d="M10 2a4 4 0 100 8 4 4 0 000-8zM3 18c0-3.3 2.7-6 6-6h2a6 6 0 016 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
 
 export default function Sidebar({ view, onViewChange, collapsed, onToggle, mobileOpen, onMobileOpen, workers, width, onResizeStart }) {
+  const { user, logout } = useAuth();
   const [time, setTime] = React.useState('');
   React.useEffect(() => {
     setTime(new Date().toTimeString().slice(0,8));
     const id = setInterval(() => setTime(new Date().toTimeString().slice(0,8)), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const handleLogout = async (e) => {
+    e.preventDefault();
+    await logout();
+  };
 
   const activeWorkers = workers.filter(w => w.status === 'active').length;
 
@@ -65,6 +74,18 @@ export default function Sidebar({ view, onViewChange, collapsed, onToggle, mobil
       <nav className="nav-menu">
         <div className="nav-section-label">主功能</div>
         {renderItems(NAV_ITEMS)}
+        {user?.is_staff && (
+          <>
+            <div className="nav-section-label" style={{marginTop:8}}>管理员</div>
+            <a key="admin" className={`nav-item${view === 'admin' ? ' active' : ''}`}
+              data-label="ADMIN"
+              onClick={e => { e.preventDefault(); onViewChange('admin'); }}
+              aria-current={view === 'admin' ? 'page' : undefined}>
+              <span className="nav-icon">{ADMIN_ICON}</span>
+              <span className="nav-label">用户管理</span>
+            </a>
+          </>
+        )}
         <div className="nav-section-label" style={{marginTop:8}}>系统</div>
         {renderItems(SYS_ITEMS)}
       </nav>
@@ -73,11 +94,16 @@ export default function Sidebar({ view, onViewChange, collapsed, onToggle, mobil
         <div className="resource-bar"><div className="resource-fill cpu" style={{width:`${Math.min(activeWorkers * 25, 100)}%`}} /></div>
         <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8}}>{activeWorkers}/{workers.length} 活跃</div>
         <div className="user-area">
-          <div className="user-avatar">A</div>
+          <div className="user-avatar">{user?.username?.[0]?.toUpperCase() || 'A'}</div>
           <div className="user-info">
-            <span className="user-name">Admin</span>
-            <span className="user-role">超级管理员</span>
+            <span className="user-name">{user?.username || 'Admin'}</span>
+            <span className="user-role">{user?.is_staff ? '管理员' : '用户'}</span>
           </div>
+          <button className="sidebar-logout-btn" onClick={handleLogout} title="退出登录">
+            <svg viewBox="0 0 16 16" fill="none" width="15" height="15">
+              <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M14 8H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
     </aside>

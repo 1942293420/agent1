@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views, sse, task_api
+from . import views
+from . import sse_views, sse, task_api
 
 router = DefaultRouter()
 router.register(r'agents', views.AgentViewSet)
@@ -31,4 +32,17 @@ urlpatterns = [
     # 任务节点可视化
     path('parent-tasks/<int:pk>/graph/', views.parent_task_graph, name='parent-task-graph'),
     path('parent-tasks/<int:pk>/stop/', views.stop_parent_task, name='stop-parent-task'),
+    path('parent-tasks/<int:pk>/stream/', sse_views.parent_task_progress_stream, name='parent-task-stream'),
+    path('parent-tasks/<int:pk>/progress/', sse_views.parent_task_progress_snapshot, name='parent-task-progress'),
+    # Auth
+    path('auth/login/', views.login_view, name='auth-login'),
+    path('auth/logout/', views.logout_view, name='auth-logout'),
+    path('auth/whoami/', views.whoami_view, name='auth-whoami'),
+    path('auth/register/', views.register_view, name='auth-register'),
+    # Admin — 用户管理
+    path('admin/users/', views.admin_list_users, name='admin-list-users'),
+    path('admin/users/add/', views.admin_add_user, name='admin-add-user'),
+    path('admin/users/<int:user_id>/approve/', views.admin_approve_user, name='admin-approve-user'),
+    path('admin/users/<int:user_id>/reject/', views.admin_reject_user, name='admin-reject-user'),
+    path('admin/users/<int:user_id>/reset-password/', views.admin_reset_password, name='admin-reset-password'),
 ]
