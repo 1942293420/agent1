@@ -553,6 +553,33 @@ textarea.form-input{resize:vertical;min-height:80px}
   .msg-bubble{max-width:90%}
 }
 
+/* ─── Mobile: Tables scroll ─── */
+@media(max-width:768px){
+  .view-container table,.card table,.session-detail-panel table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  .view-container table th,.view-container table td,.card table th,.card table td{min-width:80px;white-space:nowrap}
+  .topbar{padding:0 12px;gap:6px}
+  .topbar-username{display:none}
+  .topbar-user{border-left:none;padding-left:0;margin-left:0}
+  .topbar-logout-btn{width:32px;height:32px}
+  .notif-dropdown{width:280px;right:-60px;max-height:280px}
+  .sidebar .sidebar-logout-btn{width:36px;height:36px}
+  .detail-panel{width:100%!important;max-width:100vw;right:0}
+  .card-header{flex-wrap:wrap;gap:8px}
+  .view-actions{width:100%}
+  .view-header{flex-direction:column;align-items:flex-start}
+  .filter-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .memory-stats{grid-template-columns:repeat(2,1fr)}
+  .settings-layout{grid-template-columns:1fr}
+}
+
+@media(max-width:480px){
+  .topbar{padding:0 8px}
+  .breadcrumb{font-size:12px}
+  .memory-stats{grid-template-columns:1fr}
+  .notif-dropdown{width:260px;right:-80px}
+  .btn,.topbar-btn{min-height:36px}
+}
+
 /* ─── ChatPage — processing pulse animation ─── */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
