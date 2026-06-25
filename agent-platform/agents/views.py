@@ -1402,6 +1402,7 @@ def admin_list_users(request):
         result.append({
             'id': u.id,
             'username': u.username,
+            'display_name': u.first_name or '',
             'is_active': u.is_active,
             'is_staff': u.is_staff,
             'date_joined': u.date_joined,
