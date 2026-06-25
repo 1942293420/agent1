@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/auth/whoami/');
+        const res = await fetch('/api/auth/whoami/', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           if (data.authenticated) {
@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
     await fetch('/api/auth/logout/', {
       method: 'POST',
       headers: csrf ? { 'X-CSRFToken': csrf } : {},
+      credentials: 'include',
     }).catch(() => {});
     setUser(null);
   }, []);

@@ -177,6 +177,7 @@ export default function LoginPage({ onLogin, onGoRegister }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
+        credentials: 'include',
       });
       const data = await res.json();
       if (!res.ok) {

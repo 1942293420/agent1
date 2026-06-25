@@ -20,6 +20,7 @@ async function request(url, options = {}) {
     headers,
     ...options,
     method: method,
+    credentials: 'include',
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${url}`);
   if (res.status === 204) return null;

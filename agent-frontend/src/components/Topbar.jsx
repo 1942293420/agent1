@@ -23,7 +23,7 @@ export default function Topbar({ view, viewLabels, addToast, onMobileOpen }) {
   const fetchNotifications = async () => {
     setNotifLoading(true);
     try {
-      const res = await fetch('/api/tasks/?ordering=-created_at&page_size=5');
+      const res = await fetch('/api/tasks/?ordering=-created_at&page_size=5', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         const items = (data.results || []).map(t => ({

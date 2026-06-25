@@ -28,6 +28,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
 
   const [tasks, setTasks] = useState([]);
   const [agents, setAgents] = useState([]);
