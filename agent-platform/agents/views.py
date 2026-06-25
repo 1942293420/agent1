@@ -1419,3 +1419,21 @@ def admin_add_user(request):
         return Response({"error": "用户名已被占用"}, status=409)
     user = User.objects.create_user(username=username, password=password, is_active=True)
     return Response({"ok": True, "user": {"id": user.id, "username": user.username}}, status=201)
+
+
+@api_view(['DELETE', 'POST'])
+def admin_delete_user(request, user_id):
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({'error': '无权限'}, status=403)
+    from django.contrib.auth.models import User
+    if int(user_id) == request.user.id:
+        return Response({'error': '不能删除自己'}, status=400)
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({'error': '用户不存在'}, status=404)
+    if user.is_staff:
+        return Response({'error': '不能删除管理员'}, status=400)
+    username = user.username
+    user.delete()
+    return Response({'ok': True, 'username': username})

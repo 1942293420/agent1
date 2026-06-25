@@ -62,6 +62,20 @@ export default function AdminView({ addToast }) {
     } catch (e) { addToast('操作失败'); }
   };
 
+  const handleDelete = async (id, username) => {
+    if (!confirm(`确定要永久删除用户 ${username} 吗？此操作不可恢复。`)) return;
+    try {
+      const res = await adminFetch(`/api/admin/users/${id}/delete/`, { method: 'POST' });
+      if (res.ok) {
+        addToast(`已删除用户 ${username}`);
+        fetchUsers();
+      } else {
+        const d = await res.json();
+        addToast(d.error || '删除失败');
+      }
+    } catch (e) { addToast('操作失败'); }
+  };
+
   const handleResetPassword = async () => {
     if (!resetPwd || resetPwd.length < 6) { addToast('密码至少 6 个字符'); return; }
     try {
@@ -400,6 +414,12 @@ export default function AdminView({ addToast }) {
                       onClick={() => { setResetModal(u); setResetPwd(''); }}>
                       重置密码
                     </button>
+                    {u.id !== 1 && (
+                      <button style={{ ...styles.btn, ...styles.btnDanger }}
+                        onClick={() => handleDelete(u.id, u.username)}>
+                        删除
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
