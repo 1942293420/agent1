@@ -29,14 +29,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    const match = document.cookie.match(/csrftoken=([^;]+)/);
-    const csrf = match ? match[1] : '';
+    // 先手动清除 cookie（前端层面）
+    document.cookie = 'sessionid=; Max-Age=0; path=/';
+    document.cookie = 'csrftoken=; Max-Age=0; path=/';
+    // 再调用 API 清除服务端 session
     await fetch('/api/auth/logout/', {
       method: 'POST',
-      headers: csrf ? { 'X-CSRFToken': csrf } : {},
       credentials: 'include',
     }).catch(() => {});
-    // 强制跳转首页，触发全新 whoami 校验
+    // 强制跳转首页
     window.location.href = '/';
   }, []);
 
