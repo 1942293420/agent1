@@ -564,6 +564,8 @@ textarea.form-input{resize:vertical;min-height:80px}
   .notif-dropdown{width:280px;right:-60px;max-height:280px}
   .sidebar .sidebar-logout-btn{width:36px;height:36px}
   .detail-panel{width:100%!important;max-width:100vw;right:0}
+  .admin-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .admin-table-wrap table{min-width:600px}
   .card-header{flex-wrap:wrap;gap:8px}
   .view-actions{width:100%}
   .view-header{flex-direction:column;align-items:flex-start}

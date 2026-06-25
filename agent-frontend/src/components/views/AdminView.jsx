@@ -358,7 +358,7 @@ export default function AdminView({ addToast }) {
         </div>
       </div>
 
-      <div style={styles.tableWrap}>
+      <div className="admin-table-wrap" style={styles.tableWrap}>
         {loading ? (
           <div style={{ padding: 32, textAlign: 'center', color: '#4d6178', fontSize: 13 }}>
             加载中...
