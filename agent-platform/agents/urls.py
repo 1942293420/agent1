@@ -1,4 +1,5 @@
 from django.urls import path, include
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import sse_views, sse, task_api
@@ -41,8 +42,8 @@ urlpatterns = [
     path('auth/register/', views.register_view, name='auth-register'),
     # Admin — 用户管理
     path('admin/users/', views.admin_list_users, name='admin-list-users'),
-    path('admin/users/add/', views.admin_add_user, name='admin-add-user'),
-    path('admin/users/<int:user_id>/approve/', views.admin_approve_user, name='admin-approve-user'),
-    path('admin/users/<int:user_id>/reject/', views.admin_reject_user, name='admin-reject-user'),
-    path('admin/users/<int:user_id>/reset-password/', views.admin_reset_password, name='admin-reset-password'),
+    path('admin/users/add/', csrf_exempt(views.admin_add_user), name='admin-add-user'),
+    path('admin/users/<int:user_id>/approve/', csrf_exempt(views.admin_approve_user), name='admin-approve-user'),
+    path('admin/users/<int:user_id>/reject/', csrf_exempt(views.admin_reject_user), name='admin-reject-user'),
+    path('admin/users/<int:user_id>/reset-password/', csrf_exempt(views.admin_reset_password), name='admin-reset-password'),
 ]

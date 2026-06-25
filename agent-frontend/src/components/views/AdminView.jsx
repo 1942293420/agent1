@@ -1,5 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+
+function getCSRF() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : "";
+}
+
+async function adminFetch(url, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if ((opts.method || "GET") !== "GET") {
+    const csrf = getCSRF();
+    if (csrf) headers["X-CSRFToken"] = csrf;
+  }
+  if (opts.body && typeof opts.body === "string") {
+    headers["Content-Type"] = "application/json";
+  }
+  return fetch(url, { ...opts, headers, credentials: "include" });
+}
+
 export default function AdminView({ addToast }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +30,7 @@ export default function AdminView({ addToast }) {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/users/');
+      const res = await adminFetch('/api/admin/users/');
       if (res.ok) {
         const data = await res.json();
         setUsers(data);
@@ -25,7 +43,7 @@ export default function AdminView({ addToast }) {
 
   const handleApprove = async (id, username) => {
     try {
-      const res = await fetch(`/api/admin/users/${id}/approve/`, { method: 'POST' });
+      const res = await adminFetch(`/api/admin/users/${id}/approve/`, { method: 'POST' });
       if (res.ok) {
         addToast(`已通过 ${username} 的审批`);
         fetchUsers();
@@ -36,7 +54,7 @@ export default function AdminView({ addToast }) {
   const handleReject = async (id, username) => {
     if (!confirm(`确定要拒绝并删除 ${username} 吗？`)) return;
     try {
-      const res = await fetch(`/api/admin/users/${id}/reject/`, { method: 'POST' });
+      const res = await adminFetch(`/api/admin/users/${id}/reject/`, { method: 'POST' });
       if (res.ok) {
         addToast(`已拒绝 ${username} 的注册`);
         fetchUsers();
@@ -47,7 +65,7 @@ export default function AdminView({ addToast }) {
   const handleResetPassword = async () => {
     if (!resetPwd || resetPwd.length < 6) { addToast('密码至少 6 个字符'); return; }
     try {
-      const res = await fetch(`/api/admin/users/${resetModal.id}/reset-password/`, {
+      const res = await adminFetch(`/api/admin/users/${resetModal.id}/reset-password/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: resetPwd }),
@@ -74,7 +92,7 @@ export default function AdminView({ addToast }) {
     }
     setAddError('');
     try {
-      const res = await fetch('/api/admin/users/add/', {
+      const res = await adminFetch('/api/admin/users/add/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: newUsername.trim(), password: newPassword }),
