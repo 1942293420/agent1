@@ -56,7 +56,7 @@ function AppInner() {
       try {
         const [agRes, tRes, sRes, kRes, wRes, cjRes] = await Promise.all([
           api.get('/agents/', { page_size: 50 }),
-          api.get('/tasks/', { page_size: 100, ordering: '-created_at' }),
+          api.get('/tasks/unified/'),
           api.get('/skills/', { page_size: 200 }),
           api.get('/knowledge/', { page_size: 50 }),
           api.get('/system/workers/'),
