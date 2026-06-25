@@ -9,7 +9,7 @@ from .models import SandboxSession
 from .provider import DockerSandboxProvider, SandboxConfig
 
 
-SANDBOX_ROOT = os.environ.get("SANDBOX_ROOT", "/var/sandboxes")
+SANDBOX_ROOT = os.environ.get("SANDBOX_ROOT", "/home/jiangli/sandboxes")
 
 
 class SandboxManager:

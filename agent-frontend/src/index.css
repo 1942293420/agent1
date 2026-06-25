@@ -22,7 +22,7 @@
 }
 html{font-size:14px;-webkit-font-smoothing:antialiased}
 body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);min-height:100dvh}
-#root{display:flex;min-height:100dvh}
+#root{display:flex;flex-direction:column;min-height:100dvh}
 
 /* ─── Background Effects ─── */
 .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -311,7 +311,7 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 .memory-meta{font-size:10px;color:var(--text-muted);margin-top:4px}
 
 /* ─── Sessions ─── */
-.session-layout{display:flex;gap:0;height:calc(100vh - 160px)}
+.session-layout{display:flex;gap:0;height:calc(100vh - 132px)}
 .session-list-panel{display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding:0 8px}
 .session-list-panel::-webkit-scrollbar{width:3px}
 .session-item{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all var(--transition);position:relative}
@@ -523,7 +523,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 }
 @media(max-width:640px){
   html, body { height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
-  #root { display: block; min-height: 100%; }
+  #root { display: flex; flex-direction: column; min-height: 100%; }
   .sidebar{width:220px;min-width:220px;position:fixed;left:0;top:0;bottom:0;z-index:200;transform:translateX(-100%);transition:transform .25s ease;height:100dvh}
   .sidebar .nav-label,.sidebar .nav-badge,.sidebar .logo-text,.sidebar .sidebar-footer .user-info,
   .sidebar .resource-label,.sidebar .resource-bar,.sidebar .system-status .status-text,
@@ -598,7 +598,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 }
 
 /* ─── Output Panel ─── */
-.output-layout{display:flex;flex-direction:column;height:calc(100vh - 160px);gap:0}
+.output-layout{display:flex;flex-direction:column;height:calc(100vh - 132px);gap:0}
 .output-title-input{background:var(--bg-card);border:1px solid var(--border-subtle);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;padding:12px 18px;color:var(--text-primary);font-size:15px;font-weight:500;outline:none;font-family:var(--font-sans);transition:border-color var(--transition)}
 .output-title-input:focus{border-color:var(--border-emphasis)}
 .output-title-input::placeholder{color:var(--text-muted);font-weight:400}
@@ -838,7 +838,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .bottleneck-badge{font-size:11px;color:#E24B4A;background:rgba(226,75,74,0.1);padding:2px 8px;border-radius:10px}
 
 /* ─── Topbar v2 — 顶部导航栏 ─── */
-.main-content-v2{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100dvh;overflow:hidden}
+.main-content-v2{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .topbar-v2{height:52px;background:rgba(13,19,32,.95);border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0;backdrop-filter:blur(10px);z-index:100;position:relative}
 .topbar-v2-left{display:flex;align-items:center;gap:0;flex:1;min-width:0}
 .topbar-v2-logo{display:flex;align-items:center;gap:8px;cursor:pointer;padding:0 12px;margin-right:4px;transition:opacity var(--transition);flex-shrink:0}
