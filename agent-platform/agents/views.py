@@ -507,6 +507,13 @@ class TaskViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'priority', 'agent']
     pagination_class = StandardPagination
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated and not user.is_staff:
+            qs = qs.filter(parent_task__conversation__user=user)
+        return qs
+
     def get_serializer_class(self):
         if self.action == 'create':
             return TaskCreateSerializer
