@@ -24,7 +24,7 @@ from django.db import transaction
 from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
 from django.contrib.auth import authenticate, login, logout
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from rest_framework import viewsets, status, filters, permissions
 from rest_framework.decorators import action, api_view, permission_classes
@@ -1308,12 +1308,11 @@ def login_view(request):
     return Response({"ok": True, "user": {"id": user.id, "username": user.username, "is_staff": user.is_staff}})
 
 @csrf_exempt
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
+@api_view(['GET', 'POST'])
 def logout_view(request):
-    """登出，清除 session"""
+    """登出，清除 session，重定向到首页"""
     logout(request)
-    return Response({'ok': True})
+    return redirect('/')
 
 @ensure_csrf_cookie
 @api_view(['GET'])

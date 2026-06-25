@@ -28,18 +28,8 @@ export function AuthProvider({ children }) {
     setUser(userData);
   }, []);
 
-  const logout = useCallback(async () => {
-    const host = window.location.hostname;
-    // 双保险：无 domain + 带 domain 各删一次
-    document.cookie = 'sessionid=; Max-Age=0; path=/';
-    document.cookie = `sessionid=; Max-Age=0; path=/; domain=${host}`;
-    document.cookie = 'csrftoken=; Max-Age=0; path=/';
-    document.cookie = `csrftoken=; Max-Age=0; path=/; domain=${host}`;
-    await fetch('/api/auth/logout/', {
-      method: 'POST',
-      credentials: 'include',
-    }).catch(() => {});
-    window.location.href = '/';
+  const logout = useCallback(() => {
+    window.location.href = '/api/auth/logout/';
   }, []);
 
   return (
