@@ -395,6 +395,11 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 .attach-btn:hover{background:#3370ff;color:#fff}
 .attach-btn.uploading{animation:pulse .8s ease-in-out infinite}
 
+/* File badge delete button */
+.msg-file-badge .msg-file-delete{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e24b4a;color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1;display:none;align-items:center;justify-content:center;transition:all .15s}
+.msg-file-badge:hover .msg-file-delete{display:flex}
+.msg-file-delete:hover{background:#c0392b}
+
 /* ─── Logs ─── */
 .log-terminal{font-family:var(--font-mono);font-size:11px;background:#050a10;border-radius:var(--radius-sm);padding:14px;height:calc(100vh - 240px);overflow-y:auto;line-height:1.7}
 .log-terminal::-webkit-scrollbar{width:3px}

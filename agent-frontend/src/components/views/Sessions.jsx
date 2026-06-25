@@ -602,11 +602,28 @@ export default function Sessions() {
                                     {msgFiles[msg.id] && msgFiles[msg.id].length > 0 && (
                                       <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
                                         {msgFiles[msg.id].map(f => (
-                                          <a key={f.id} href={f.file} target="_blank" rel="noopener noreferrer"
-                                            style={{fontSize:11,color:'#3370ff',textDecoration:'none',display:'flex',alignItems:'center',gap:4,
-                                              background:'rgba(51,112,255,0.06)',padding:'4px 8px',borderRadius:6}}>
-                                            📎 {f.original_name} <span style={{color:'#8f959e'}}>{(f.size/1024).toFixed(0)}KB</span>
-                                          </a>
+                                          <div key={f.id} className="msg-file-badge"
+                                            style={{fontSize:11,color:'#3370ff',display:'flex',alignItems:'center',gap:4,
+                                              background:'rgba(51,112,255,0.06)',padding:'4px 8px',borderRadius:6,position:'relative'}}>
+                                            <a href={f.file} target="_blank" rel="noopener noreferrer"
+                                              style={{color:'inherit',textDecoration:'none',display:'flex',alignItems:'center',gap:4,flex:1}}>
+                                              📎 {f.original_name} <span style={{color:'#8f959e'}}>{(f.size/1024).toFixed(0)}KB</span>
+                                            </a>
+                                            <button
+                                              className="msg-file-delete"
+                                              onClick={async (e) => {
+                                                e.preventDefault();
+                                                try { await api.delete('/files/' + f.id + '/'); } catch {}
+                                                setMsgFiles(prev => {
+                                                  const updated = { ...prev };
+                                                  updated[msg.id] = updated[msg.id].filter(x => x.id !== f.id);
+                                                  if (updated[msg.id].length === 0) delete updated[msg.id];
+                                                  return updated;
+                                                });
+                                              }}
+                                              title="取消上传"
+                                            >×</button>
+                                          </div>
                                         ))}
                                       </div>
                                     )}

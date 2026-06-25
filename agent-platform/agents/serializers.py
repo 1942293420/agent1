@@ -461,13 +461,20 @@ class ConversationListSerializer(serializers.ModelSerializer):
 
 class UploadedFileSerializer(serializers.ModelSerializer):
     uploader_name = serializers.CharField(source='uploader.username', read_only=True)
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
         model = UploadedFile
         fields = ['id', 'uploader', 'uploader_name', 'conversation', 'file', 'original_name',
-                  'mime_type', 'size', 'is_admin', 'expires_at', 'agent_name', 'created_at']
+                  'mime_type', 'size', 'is_admin', 'expires_at', 'agent_name', 'created_at', 'file_url']
         read_only_fields = ['id', 'created_at', 'uploader_name', 'uploader']
         extra_kwargs = {'original_name': {'required': False}, 'file': {'required': True}}
+
+
+    def get_file_url(self, obj):
+        if obj.file:
+            return f'/media/{obj.file.name}'
+        return None
 
 
 # ═══════════════════════════════════════════════

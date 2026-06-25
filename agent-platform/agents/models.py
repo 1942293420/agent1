@@ -886,9 +886,9 @@ class UserPasswordRecord(models.Model):
 # ═══════════════════════════════════════════════
 
 def _upload_to(instance, filename):
-    import os
+    import os, uuid
     ext = os.path.splitext(filename)[1]
-    return f'uploads/{instance.uploader.username}/{instance.id}{ext}'
+    return f'uploads/{instance.uploader.username}/{uuid.uuid4().hex[:8]}{ext}'
 
 
 class UploadedFile(models.Model):
