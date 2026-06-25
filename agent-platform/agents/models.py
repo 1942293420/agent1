@@ -262,6 +262,11 @@ class Task(models.Model):
         choices=[('user', '用户派发'), ('cron', '定时触发'), ('agent', 'Agent自发'), ('web', 'Web Chat'), ('feishu', '飞书')],
         default='user', db_index=True,
     )
+    conversation = models.ForeignKey(
+        'Conversation', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='tasks', db_index=True,
+        help_text='关联的会话，Web Chat 消息自动创建',
+    )
 
     # 时间
     created_at = models.DateTimeField(auto_now_add=True)

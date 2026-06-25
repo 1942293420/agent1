@@ -48,7 +48,8 @@ export default function MessageRenderer({ content = '', isStreaming, onRetry, ma
   }
 
   const body = renderBodyContent(text);
-  return streamCursor ? React.createElement('div', null, body, streamCursor) : body;
+  const wrapped = React.createElement("div", { className: "chat-message-renderer" }, body, streamCursor || null);
+  return wrapped ? React.createElement('div', null, body, streamCursor) : body;
 }
 
 function renderBodyContent(text = '') {

@@ -237,6 +237,7 @@ class TaskSerializer(serializers.ModelSerializer):
             'contract', 'context', 'knowledge_refs',
             'agent', 'agent_name',
             'assigned_skills', 'parent_task',
+            'conversation',
             'status', 'priority', 'source', 'source_label',
             'log_count', 'subtask_count',
             'result',

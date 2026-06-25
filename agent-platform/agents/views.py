@@ -889,6 +889,26 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # 🎯 用户消息 → Redis 队列实时处理
         if message.role == Message.Role.USER:
+            # 自动创建/更新任务记录
+            try:
+                from agents.models import Task
+                task, created = Task.objects.get_or_create(
+                    conversation=conv,
+                    defaults={
+                        'title': message.content[:60],
+                        'agent': conv.agent,
+                        'description': message.content[:200],
+                        'status': 'pending',
+                        'priority': 'medium',
+                    }
+                )
+                if not created:
+                    task.description = message.content[:200]
+                    task.status = 'pending'
+                    task.save(update_fields=['description', 'status'])
+            except Exception:
+                pass
+
             try:
                 from redis import Redis
                 r = Redis.from_url("redis://localhost:6379/0")
