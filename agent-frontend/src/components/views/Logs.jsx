@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useApp } from '../../AppContext';
 import { api } from '../../api';
 
-export default function Logs({ addToast }) {
+export default function Logs() {
+  const { addToast } = useApp();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 

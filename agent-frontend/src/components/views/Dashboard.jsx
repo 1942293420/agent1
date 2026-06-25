@@ -1,6 +1,8 @@
+import { useApp } from '../../AppContext';
 import React from 'react';
 
-export default function Dashboard({ tasks, agents, skills, memory, workers, loading, addToast, openDetail, setView }) {
+export default function Dashboard() {
+  const { tasks, agents, skills, memory, workers, loading, addToast, openDetail, setView } = useApp();
   const activeTasks = tasks.filter(t => t.status === 'running' || t.status === 'in_progress' || t.status === 'pending');
   const onlineAgents = agents.filter(a => a.status === 'online');
   const recentTasks = tasks.slice(0, 8);

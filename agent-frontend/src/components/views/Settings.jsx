@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useApp } from '../../AppContext';
 
 const PAGES = {
   general: (
@@ -53,7 +54,8 @@ function SettingToggle({ label, desc, defaultChecked, onChange }) {
   );
 }
 
-export default function Settings({ addToast }) {
+export default function Settings() {
+  const { addToast } = useApp();
   const [tab, setTab] = useState('general');
   const tabs = { general:'基本设置', model:'模型配置', security:'安全认证', notification:'通知设置' };
 

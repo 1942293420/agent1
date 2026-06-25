@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { api } from '../api';
+import { useApp } from '../AppContext';
 
-export default function Modal({ type, data, onClose, addToast, tasks, setTasks, agents, setAgents, skills, setSkills, memory, setMemory, sessions, setSessions }) {
+export default function Modal({ type, data, onClose }){
+  const { addToast, tasks, setTasks, agents, setAgents, skills, setSkills, memory, setMemory, sessions, setSessions } = useApp();
   if (!type) return null;
 
   const MODALS = {

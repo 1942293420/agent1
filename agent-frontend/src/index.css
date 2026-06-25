@@ -836,3 +836,43 @@ textarea.form-input{resize:vertical;min-height:80px}
 .status-badge.pending{color:#BA7517;background:rgba(186,117,23,0.12)}
 .status-badge.failed,.status-badge.cancelled{color:#E24B4A;background:rgba(226,75,74,0.12)}
 .bottleneck-badge{font-size:11px;color:#E24B4A;background:rgba(226,75,74,0.1);padding:2px 8px;border-radius:10px}
+
+/* ─── Topbar v2 — 顶部导航栏 ─── */
+.main-content-v2{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100dvh;overflow:hidden}
+.topbar-v2{height:52px;background:rgba(13,19,32,.95);border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0;backdrop-filter:blur(10px);z-index:100;position:relative}
+.topbar-v2-left{display:flex;align-items:center;gap:0;flex:1;min-width:0}
+.topbar-v2-logo{display:flex;align-items:center;gap:8px;cursor:pointer;padding:0 12px;margin-right:4px;transition:opacity var(--transition);flex-shrink:0}
+.topbar-v2-logo:hover{opacity:.8}
+.topbar-v2-brand{font-size:15px;font-weight:600;color:var(--text-primary);letter-spacing:.5px}
+.topbar-v2-nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto}
+.topbar-v2-nav::-webkit-scrollbar{height:0}
+.topbar-v2-nav-item{display:flex;align-items:center;gap:6px;padding:6px 12px;background:none;border:none;color:var(--text-secondary);font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:all var(--transition);white-space:nowrap;font-family:var(--font-sans)}
+.topbar-v2-nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.topbar-v2-nav-item.active{background:var(--cyan-dim);color:var(--cyan)}
+.topbar-v2-nav-icon{font-size:14px;line-height:1}
+.topbar-v2-nav-label{font-size:12px}
+
+/* Right side — user area */
+.topbar-v2-right{display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0}
+.topbar-v2-user{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border-radius:8px;border:1px solid var(--border-subtle);background:none;cursor:pointer;color:var(--text-secondary);transition:all var(--transition);font-family:var(--font-sans)}
+.topbar-v2-user:hover{background:var(--bg-hover);color:var(--text-primary)}
+.topbar-v2-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.topbar-v2-avatar-placeholder{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff}
+.topbar-v2-username{font-size:12px;font-weight:500;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Dropdown */
+.topbar-v2-dropdown{position:absolute;top:calc(100% + 8px);right:0;min-width:160px;background:var(--bg-card);border:1px solid var(--border-default);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.5);overflow:hidden;z-index:200}
+.topbar-v2-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:none;border:none;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all var(--transition);text-align:left;font-family:var(--font-sans)}
+.topbar-v2-dropdown-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.topbar-v2-dropdown-danger:hover{color:var(--red);background:var(--red-dim)}
+.topbar-v2-dropdown-divider{height:1px;background:var(--border-subtle);margin:4px 0}
+
+@media(max-width:768px){
+  .topbar-v2-nav{display:none}
+  .topbar-v2-logo{padding:0 8px}
+  .topbar-v2-brand{font-size:13px}
+}
+@media(max-width:640px){
+  .topbar-v2{padding:0 8px}
+  .topbar-v2-username{display:none}
+}

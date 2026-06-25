@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import { useApp } from '../../AppContext';
 
-export default function TokensView({ tasks, loading }) {
+export default function TokensView() {
+  const { tasks, loading } = useApp();
   const [tokenStats, setTokenStats] = useState(null);
 
   useEffect(() => {

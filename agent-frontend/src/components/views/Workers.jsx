@@ -1,6 +1,8 @@
+import { useApp } from '../../AppContext';
 import React from 'react';
 
-export default function WorkersView({ workers, loading }) {
+export default function WorkersView() {
+  const { workers, loading } = useApp();
   return (
     <>
       <div className="view-header">

@@ -1,7 +1,9 @@
+import { useApp } from '../../AppContext';
 import React, { useState } from 'react';
 // imports removed
 
-export default function MemoryView({ memory, setMemory, addToast, openDetail, openModal }) {
+export default function MemoryView() {
+  const { memory, setMemory, addToast, openDetail, openModal } = useApp();
   const [filter, setFilter] = useState('all');
 
   let filtered = memory.filter(m => filter === 'all' || m.entry_type === filter);

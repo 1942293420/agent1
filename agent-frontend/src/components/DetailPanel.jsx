@@ -1,6 +1,8 @@
 import React from 'react';
+import { useApp } from '../AppContext';
 
-export default function DetailPanel({ type, data, onClose, agents, tasks, addToast, openDetail, setTasks, setAgents }) {
+export default function DetailPanel({ type, data, onClose }) {
+  const { agents, tasks, addToast, openDetail, setTasks, setAgents } = useApp();
   if (!type || !data) return null;
 
   return (

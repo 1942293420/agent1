@@ -1,8 +1,10 @@
+import { useApp } from '../../AppContext';
 import React, { useState } from 'react';
 import TaskGraph from './TaskGraph';
 import RealtimeDashboard from './RealtimeDashboard';
 
-export default function Tasks({ tasks, setTasks, addToast, openDetail, openModal, setView }) {
+export default function Tasks({ openModal }) {
+  const { tasks, setTasks, addToast, openDetail, setView } = useApp();
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [batchMode, setBatchMode] = useState(false);

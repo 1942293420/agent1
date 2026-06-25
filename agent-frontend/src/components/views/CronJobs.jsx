@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import { useApp } from '../../AppContext';
 
-export default function CronJobsView({ cronJobs, setCronJobs, loading, addToast }) {
+export default function CronJobsView() {
+  const { cronJobs, setCronJobs, loading, addToast } = useApp();
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState('');
   const [editSchedule, setEditSchedule] = useState('');

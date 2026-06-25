@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'agents',
+    'agent_sandbox',
 ]
 
 MIDDLEWARE = [

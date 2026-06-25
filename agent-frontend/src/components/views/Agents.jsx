@@ -1,3 +1,4 @@
+import { useApp } from '../../AppContext';
 import React, { useState } from 'react';
 
 const COLOR_CYCLE = ['blue','green','purple','amber','coral'];
@@ -9,7 +10,8 @@ const COLOR_MAP = {
   coral: { bg:'rgba(216,90,48,0.12)', border:'rgba(216,90,48,0.3)', text:'#D85A30' },
 };
 
-export default function Agents({ agents, addToast, openDetail }) {
+export default function Agents() {
+  const { agents, addToast, openDetail } = useApp();
   const [filter, setFilter] = useState('all');
 
   const filtered = agents.filter(a => filter === 'all' || a.status === filter);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api';
+import { useApp } from '../../AppContext';
 
 const MSG_GAP_MINUTES = 5;
 
@@ -84,7 +85,8 @@ function useResize(defaultSize, min, max, direction) {
   return { size, onMouseDown };
 }
 
-export default function Sessions({ sessions, setSessions, agents, addToast, openModal }) {
+export default function Sessions() {
+  const { sessions, setSessions, agents, addToast, openModal } = useApp();
   const [active, setActive] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');

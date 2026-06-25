@@ -1,3 +1,4 @@
+import { useApp } from '../../AppContext';
 import React, { useState } from 'react';
 
 const COLOR_MAP = {
@@ -8,7 +9,8 @@ const COLOR_MAP = {
 
 const CATEGORIES = ['全部','tools','开发','搜索','视觉','nlp','数据库','监控','文档','active'];
 
-export default function Skills({ skills, addToast, openDetail }) {
+export default function Skills() {
+  const { skills, addToast, openDetail } = useApp();
   const [cat, setCat] = useState('全部');
   const [search, setSearch] = useState('');
 
