@@ -24,7 +24,7 @@ CMD_PATTERNS = {
     # v3 原有
     "SPAWN_BANNI": re.compile(r"^SPAWN_BANNI\s*:?\s*(.+)", re.I),
     "SPAWN_BASIR": re.compile(r"^SPAWN_BASIR\s*:?\s*(.+)", re.I),
-    "SPAWN_YUNHENG": re.compile(r"^SPAWN_YUNHENG\s*:?\s*(.+)", re.I),
+    "SPAWN_TESTER": re.compile(r"^SPAWN_TESTER\s*:?\s*(.+)", re.I),
     "CHECK":       re.compile(r"^CHECK\s+(\S+)", re.I),
     "WAIT_ALL":    re.compile(r"^WAIT_ALL$", re.I),
     "KILL":        re.compile(r"^KILL\s+(\S+)", re.I),
@@ -537,8 +537,8 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                         response = handler.spawn("banni", m.group(1))
                     elif cmd_name == "SPAWN_BASIR":
                         response = handler.spawn("basir", m.group(1))
-                    elif cmd_name == "SPAWN_YUNHENG":
-                        response = handler.spawn("yunheng", m.group(1))
+                    elif cmd_name == "SPAWN_TESTER":
+                        response = handler.spawn("tester", m.group(1))
                     elif cmd_name == "CHECK":
                         response = handler.check(m.group(1))
                     elif cmd_name == "WAIT_ALL":
@@ -739,7 +739,7 @@ complexity: medium
 tasks:
   - id: t1, agent: banni, desc: 简短任务描述(单行), deps: []
   - id: t2, agent: basir, desc: 简短任务描述(单行), deps: [t1]
-  - id: t3, agent: yunheng, desc: 代码审查和测试, deps: [t1]
+  - id: t3, agent: tester, desc: 代码审查和测试, deps: [t1]
 
 ## 输出面板
 用户明确要求「用输出面板」时，在 REPLY 末尾用 OUTPUT_PANEL 标记。平常直接 REPLY 回复即可。格式：

@@ -20,7 +20,7 @@ AGENT_REGISTRY = {
         "capabilities": ["search", "code_gen", "web_fetch", "file_ops", "feishu_doc", "feishu_drive"],
         "output_format": "raw_text",
     },
-    "yunheng": {
+    "tester": {
         "name": "云衡",
         "role_prompt": (
             "你是 云衡（端测测），Web 应用测试全链路专家 Agent。\n"

@@ -440,10 +440,6 @@ export default function Sessions() {
 
   return (
     <>
-      <div className="view-header">
-        <h1 className="view-title">会话中心</h1>
-      </div>
-
       <div className="session-layout">
         {/* Session list — resizable */}
         <div className="session-list-panel light" style={{ width: listResize.size, minWidth: listResize.size, flexShrink: 0 }}>

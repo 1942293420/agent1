@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: '仪表盘', icon: '📊' },
   { key: 'agents', label: 'Agent管理', icon: '🤖' },
   { key: 'tasks', label: '任务与用量', icon: '📋' },
-  { key: 'sessions', label: '会话中心', icon: '💬' },
+  { key: 'sessions', label: '新建任务', icon: '💬' },
   { key: 'skills', label: 'Skill 库', icon: '⭐' },
   { key: 'memory', label: '记忆管理', icon: '🧠' },
 ];
