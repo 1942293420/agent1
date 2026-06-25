@@ -171,7 +171,7 @@ export default function Tasks({ openModal }) {
                   {paged.map(t => {
                     const sc = statusColors[t.status] || statusColors.pending;
                     return (
-                      <tr key={t.id} onClick={() => { if (!batchMode) { if (t._type === 'parent') { setGraphTaskId(t.id); setViewMode('graph-full'); } else { openModal('taskDetail', t); } } }}>
+                      <tr key={t.id} onClick={() => { if (!batchMode) { if (t.type === 'parent_task' || String(t.id).startsWith('pt-')) { setGraphTaskId(parseInt(String(t.id).replace('pt-',''))); setViewMode('graph-full'); } else { openModal('taskDetail', t); } } }}>
                         {batchMode && <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selected.has(t.id)} onChange={()=>toggleSelect(t.id)} /></td>}
                         <td><div style={{fontWeight:500,fontSize:13}}>{t.title}</div><div style={{fontSize:10,color:'var(--text-muted)',fontFamily:'var(--font-mono)'}}>#{t.id}</div></td>
                         <td><span style={{color:'var(--cyan)',fontSize:12}}>{t.agent_name || '—'}</span></td>
