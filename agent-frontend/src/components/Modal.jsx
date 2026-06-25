@@ -207,9 +207,11 @@ function AddMemoryForm({ onClose, addToast, memory, setMemory }) {
 function NewSessionForm({ onClose, addToast, sessions, setSessions, agents }) {
   const [title, setTitle] = useState('');
   const [agentId, setAgentId] = useState('');
+  const existing = agentId ? sessions.find(s => String(s.agent) === String(agentId)) : null;
 
   const submit = async () => {
     if (!agentId) return addToast('请选择一个 Agent', 'error');
+    if (existing) { onClose(); return; } // already exists, just close
     try {
       const data = await api.post('/conversations/', {
         title: title.trim() || '新会话',
@@ -228,10 +230,18 @@ function NewSessionForm({ onClose, addToast, sessions, setSessions, agents }) {
         <select className="form-input" value={agentId} onChange={e => setAgentId(e.target.value)}>
           <option value="">选择 Agent...</option>
           {agents.map(a => <option key={a.id} value={a.id}>{a.name}{a.portrait ? ' — ' + a.portrait : ''}</option>)}
-        </select></div>
+        </select>
+        {existing && (
+          <div style={{marginTop:8,padding:'8px 12px',background:'rgba(51,112,255,0.06)',border:'1px solid rgba(51,112,255,0.2)',borderRadius:8,fontSize:12,color:'#3370ff'}}>
+            此 Agent 已有会话，无需重复创建。关闭后在列表点击即可。
+          </div>
+        )}
+      </div>
       <div className="modal-footer">
         <button className="btn btn-ghost" onClick={onClose}>取消</button>
-        <button className="btn btn-primary" onClick={submit} disabled={!agentId}>创建会话</button>
+        <button className="btn btn-primary" onClick={submit} disabled={!agentId || !!existing}>
+          {existing ? '已有会话' : '创建会话'}
+        </button>
       </div>
     </>
   );

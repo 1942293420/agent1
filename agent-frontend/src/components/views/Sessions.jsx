@@ -332,7 +332,8 @@ export default function Sessions() {
         const fd = new FormData();
         fd.append('file', file);
         fd.append('original_name', file.name);
-        fd.append('conversation', active);
+        fd.append('conversation', String(active));
+        fd.append('agent_name', activeSession?.agent_name || '');
         const result = await api.upload('/files/', fd);
         uploaded.push(result);
       } catch (e) { addToast(`上传失败: ${file.name}`, 'error'); }
@@ -343,6 +344,17 @@ export default function Sessions() {
     }
     setUploading(false);
   };
+
+  // Fetch uploaded files when conversation changes (shared by agent)
+  useEffect(() => {
+    if (!active || !activeSession?.agent_name) { setUploadedFiles([]); return; }
+    (async () => {
+      try {
+        const data = await api.get('/files/', { agent: activeSession.agent_name, page_size: 50 });
+        setUploadedFiles(data.results || []);
+      } catch {}
+    })();
+  }, [active, activeSession?.agent_name]);
 
   const renderContent = (content = '') => {
     if (!content) return null;

@@ -1542,6 +1542,8 @@ class UploadedFileViewSet(viewsets.ModelViewSet):
     serializer_class = UploadedFileSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = StandardPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['conversation', 'agent_name']
 
     def perform_create(self, serializer):
         from datetime import timedelta
@@ -1552,10 +1554,14 @@ class UploadedFileViewSet(viewsets.ModelViewSet):
         uploaded_file = self.request.FILES.get('file')
         serializer.save(
             uploader=user,
+            original_name=uploaded_file.name,
             is_admin=is_admin,
             expires_at=expires,
             size=uploaded_file.size,
             mime_type=uploaded_file.content_type or 'application/octet-stream',
+            agent_name=serializer.validated_data.get('conversation') and Conversation.objects.filter(
+                pk=serializer.validated_data['conversation'].id
+            ).values_list('agent__name', flat=True).first() or '',
         )
 
     def get_queryset(self):

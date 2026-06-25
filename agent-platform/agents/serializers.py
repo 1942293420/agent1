@@ -465,8 +465,8 @@ class UploadedFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UploadedFile
         fields = ['id', 'uploader', 'uploader_name', 'conversation', 'file', 'original_name',
-                  'mime_type', 'size', 'is_admin', 'expires_at', 'created_at']
-        read_only_fields = ['id', 'created_at', 'uploader_name', 'file']
+                  'mime_type', 'size', 'is_admin', 'expires_at', 'agent_name', 'created_at']
+        read_only_fields = ['id', 'created_at', 'uploader_name', 'uploader', 'file']
 
 
 # ═══════════════════════════════════════════════

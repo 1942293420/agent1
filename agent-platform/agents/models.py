@@ -900,6 +900,7 @@ class UploadedFile(models.Model):
     size = models.BigIntegerField(default=0, help_text='字节数')
     is_admin = models.BooleanField(default=False, db_index=True, help_text='管理员文件不自动删除')
     expires_at = models.DateTimeField(null=True, blank=True, db_index=True, help_text='沙箱过期时间')
+    agent_name = models.CharField(max_length=128, blank=True, default='', db_index=True, help_text='关联Agent名，同Agent共享文件')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
