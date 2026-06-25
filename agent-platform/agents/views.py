@@ -722,7 +722,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 serializer.instance = existing
                 return
 
-        conversation = serializer.save()
+        # 绑定当前 Web 用户（权限控制用）
+        user = None
+        if request.user.is_authenticated:
+            user = request.user
+        conversation = serializer.save(user=user)
         Message.objects.create(
             conversation=conversation,
             role=Message.Role.SYSTEM,

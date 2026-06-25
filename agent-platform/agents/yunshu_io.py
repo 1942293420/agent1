@@ -210,11 +210,21 @@ class YunshuCommandHandler:
                 import sys
                 print(f"[YunshuIO] TaskNode SPAWN link failed: {e}", file=sys.stderr)
 
+        # ── 权限控制：非 staff 用户禁止 terminal/file ──
+        tools = "terminal,file,web,feishu_doc,feishu_drive"
+        if _HAS_DJANGO:
+            try:
+                pt = ParentTask.objects.select_related('conversation__user').get(pk=self.parent_id)
+                if pt.conversation and pt.conversation.user and not pt.conversation.user.is_staff:
+                    tools = "web,feishu_doc,feishu_drive"
+            except Exception:
+                pass
+
         proc = subprocess.Popen(
             ["hermes", "chat", "-q",
              f"<system_instruction>{role_prompt}</system_instruction>\n{prompt}",
              "-p", agent, "-Q", "--yolo",
-             "-t", "terminal,file,web,feishu_doc,feishu_drive"],
+             "-t", tools],
             bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
             cwd=os.path.expanduser("~")
         )

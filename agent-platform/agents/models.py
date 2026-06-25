@@ -541,6 +541,11 @@ class Conversation(models.Model):
         Agent, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='conversations',
     )
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='conversations',
+        help_text='Web 用户，用于权限控制',
+    )
     feishu_chat_id = models.CharField(
         max_length=128, null=True, blank=True, db_index=True,
         help_text='飞书会话ID，用于跨平台对话关联',
