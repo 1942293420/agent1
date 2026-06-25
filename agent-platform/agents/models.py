@@ -880,3 +880,35 @@ class UserPasswordRecord(models.Model):
 
     def __str__(self):
         return f'{self.user.username} — {self.created_at.strftime("%Y-%m-%d %H:%M")}'
+
+# ═══════════════════════════════════════════════
+# 文件上传 — 对话附件 + 沙箱管理
+# ═══════════════════════════════════════════════
+
+def _upload_to(instance, filename):
+    import os
+    ext = os.path.splitext(filename)[1]
+    return f'uploads/{instance.uploader.username}/{instance.id}{ext}'
+
+
+class UploadedFile(models.Model):
+    uploader = models.ForeignKey(User, on_delete=models.CASCADE, related_name='uploads')
+    conversation = models.ForeignKey('Conversation', on_delete=models.SET_NULL, null=True, blank=True, related_name='uploads')
+    file = models.FileField(upload_to=_upload_to, max_length=256)
+    original_name = models.CharField(max_length=256)
+    mime_type = models.CharField(max_length=128, default='application/octet-stream')
+    size = models.BigIntegerField(default=0, help_text='字节数')
+    is_admin = models.BooleanField(default=False, db_index=True, help_text='管理员文件不自动删除')
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True, help_text='沙箱过期时间')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'uploaded_files'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['uploader', '-created_at']),
+            models.Index(fields=['expires_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.original_name} ({self.size}B) by {self.uploader.username}'

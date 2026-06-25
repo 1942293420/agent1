@@ -388,6 +388,13 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 .scroll-bottom-btn{position:sticky;bottom:8px;left:50%;transform:translateX(-50%);width:34px;height:34px;border-radius:50%;background:#fff;color:#3370ff;border:1px solid #dee2eb;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);z-index:10;transition:all 0.2s}
 .scroll-bottom-btn:hover{box-shadow:0 4px 12px rgba(51,112,255,0.2);border-color:#3370ff}
 
+/* File upload */
+.drag-zone{position:absolute;bottom:60px;left:16px;right:16px;background:rgba(51,112,255,0.1);border:2px dashed #3370ff;border-radius:12px;padding:20px;text-align:center;color:#3370ff;font-size:13px;z-index:20;pointer-events:none}
+.drag-zone.active{background:rgba(51,112,255,0.18)}
+.attach-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;cursor:pointer;color:#8f959e;background:#f2f4f7;transition:all .15s;font-size:14px;flex-shrink:0}
+.attach-btn:hover{background:#3370ff;color:#fff}
+.attach-btn.uploading{animation:pulse .8s ease-in-out infinite}
+
 /* ─── Logs ─── */
 .log-terminal{font-family:var(--font-mono);font-size:11px;background:#050a10;border-radius:var(--radius-sm);padding:14px;height:calc(100vh - 240px);overflow-y:auto;line-height:1.7}
 .log-terminal::-webkit-scrollbar{width:3px}

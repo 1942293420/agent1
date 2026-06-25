@@ -102,6 +102,9 @@ export default function Sessions() {
   const [outputContent, setOutputContent] = useState('');
   const [outputCopied, setOutputCopied] = useState(false);
   const [outputFullscreen, setOutputFullscreen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
   const messagesEnd = useRef(null);
   const chatContainer = useRef(null);
   const scrollPositions = useRef({});
@@ -303,6 +306,42 @@ export default function Sessions() {
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  const handleFileDrop = async (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    await uploadFiles(files);
+  };
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    await uploadFiles(files);
+    e.target.value = '';
+  };
+
+  const uploadFiles = async (files) => {
+    if (!active) { addToast('请先选择会话', 'error'); return; }
+    setUploading(true);
+    const uploaded = [];
+    for (const file of files) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('original_name', file.name);
+        fd.append('conversation', active);
+        const result = await api.upload('/files/', fd);
+        uploaded.push(result);
+      } catch (e) { addToast(`上传失败: ${file.name}`, 'error'); }
+    }
+    if (uploaded.length > 0) {
+      setUploadedFiles(prev => [...prev, ...uploaded]);
+      addToast(`已上传 ${uploaded.length} 个文件`, 'success');
+    }
+    setUploading(false);
   };
 
   const renderContent = (content = '') => {
@@ -552,8 +591,35 @@ export default function Sessions() {
                     )}
                   </div>
 
+                  {/* Uploaded files preview */}
+                  {uploadedFiles.length > 0 && (
+                    <div style={{padding:'0 16px 8px',display:'flex',gap:6,flexWrap:'wrap'}}>
+                      {uploadedFiles.map(f => (
+                        <span key={f.id} style={{fontSize:10,padding:'3px 8px',background:'rgba(51,112,255,0.08)',border:'1px solid rgba(51,112,255,0.2)',borderRadius:10,color:'#3370ff',cursor:'pointer'}}
+                          onClick={() => window.open(f.file, '_blank')}>
+                          📎 {f.original_name?.slice(0,25)}{(f.size > 1024 ? ` ${(f.size/1024).toFixed(0)}KB` : '')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Drag zone */}
+                  <div
+                    className={`drag-zone${dragOver ? ' active' : ''}`}
+                    onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleFileDrop}
+                    style={{display: dragOver ? 'block' : 'none'}}
+                  >
+                    <div>📁 拖放文件到此处上传</div>
+                  </div>
+
                   {/* Input */}
                   <div className="session-input-area">
+                    <input type="file" id="file-upload-input" multiple style={{display:'none'}} onChange={handleFileSelect} />
+                    <label htmlFor="file-upload-input" className={`attach-btn${uploading ? ' uploading' : ''}`} title="上传文件">
+                      {uploading ? '⏳' : '📎'}
+                    </label>
                     <textarea
                       placeholder="输入消息..."
                       value={input}

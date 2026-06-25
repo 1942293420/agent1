@@ -11,7 +11,7 @@ from django.db.models import Count
 from .models import (
     CapabilityTag, Agent, Skill, AgentSkill,
     Task, ExecutionLog, KnowledgeEntry, CronExecution, CronJob,
-    Conversation, Message, TaskNode,
+    Conversation, Message, TaskNode, UploadedFile,
 )
 
 
@@ -454,6 +454,19 @@ class ConversationListSerializer(serializers.ModelSerializer):
         """是否有多个来源的消息"""
         sources = obj.messages.values_list('source', flat=True).distinct()
         return len(set(sources)) > 1
+
+# ═══════════════════════════════════════════════
+# UploadedFile
+# ═══════════════════════════════════════════════
+
+class UploadedFileSerializer(serializers.ModelSerializer):
+    uploader_name = serializers.CharField(source='uploader.username', read_only=True)
+
+    class Meta:
+        model = UploadedFile
+        fields = ['id', 'uploader', 'uploader_name', 'conversation', 'file', 'original_name',
+                  'mime_type', 'size', 'is_admin', 'expires_at', 'created_at']
+        read_only_fields = ['id', 'created_at', 'uploader_name', 'file']
 
 
 # ═══════════════════════════════════════════════

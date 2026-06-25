@@ -14,6 +14,7 @@ router.register(r'cron-executions', views.CronExecutionViewSet)
 router.register(r'cron-jobs', views.CronJobViewSet)
 router.register(r'conversations', views.ConversationViewSet)
 router.register(r'messages', views.MessageViewSet)
+router.register(r'files', views.UploadedFileViewSet)
 
 app_name = 'agents'
 

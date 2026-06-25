@@ -142,7 +142,7 @@ def _call_llm_for_reply(conversation_id: int, agent_portrait: str = ''):
 from .models import (
     CapabilityTag, Agent, Skill, AgentSkill,
     Task, ExecutionLog, KnowledgeEntry, CronExecution, CronJob,
-    Conversation, Message,
+    Conversation, Message, UploadedFile,
 )
 from .auth import AgentEndpointPermission
 from .serializers import (
@@ -161,6 +161,7 @@ from .serializers import (
     MessageSerializer,
     ConversationSerializer,
     ConversationListSerializer,
+    UploadedFileSerializer,
 )
 
 
@@ -736,11 +737,28 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 return
 
         # Web：同一用户+agent 复用已有对话
-        if agent and not feishu_chat_id and user:
+        if agent and user:
             existing = Conversation.objects.filter(agent=agent, user=user).first()
             if existing:
                 serializer.instance = existing
                 return
+
+        # 无 agent 时：同用户复用最近对话
+        if user and not agent:
+            existing = Conversation.objects.filter(user=user).order_by('-created_at').first()
+            if existing:
+                serializer.instance = existing
+                return
+
+        # 限制每用户最多 4 个会话
+        if user:
+            count = Conversation.objects.filter(user=user).count()
+            if count >= 4:
+                # 复用最早的会话
+                existing = Conversation.objects.filter(user=user).order_by('created_at').first()
+                if existing:
+                    serializer.instance = existing
+                    return
 
         conversation = serializer.save(user=user)
         Message.objects.create(
@@ -1513,3 +1531,52 @@ def admin_delete_user(request, user_id):
     username = user.username
     user.delete()
     return Response({'ok': True, 'username': username})
+
+
+# ═══════════════════════════════════════════════
+# UploadedFile ViewSet
+# ═══════════════════════════════════════════════
+
+class UploadedFileViewSet(viewsets.ModelViewSet):
+    queryset = UploadedFile.objects.select_related('uploader', 'conversation').order_by('-created_at')
+    serializer_class = UploadedFileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardPagination
+
+    def perform_create(self, serializer):
+        from datetime import timedelta
+        from django.utils import timezone
+        user = self.request.user
+        is_admin = user.is_staff
+        expires = None if is_admin else timezone.now() + timedelta(hours=24)
+        uploaded_file = self.request.FILES.get('file')
+        serializer.save(
+            uploader=user,
+            is_admin=is_admin,
+            expires_at=expires,
+            size=uploaded_file.size,
+            mime_type=uploaded_file.content_type or 'application/octet-stream',
+        )
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_authenticated:
+            return qs.none()
+        if not user.is_staff:
+            qs = qs.filter(uploader=user)
+        return qs
+
+    @action(detail=False, methods=['post'], url_path='cleanup-expired')
+    def cleanup_expired(self, request):
+        """清理过期文件（非admin），可被 cron 调用"""
+        from django.utils import timezone
+        expired = UploadedFile.objects.filter(
+            is_admin=False,
+            expires_at__lt=timezone.now()
+        )
+        count = expired.count()
+        for f in expired:
+            f.file.delete(save=False)
+        expired.delete()
+        return Response({'ok': True, 'deleted': count})
