@@ -126,7 +126,7 @@ function renderTextBlock(text, key) {
   // Plain text with markdown links
   const html = text
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code style="background:rgba(0,0,0,.06);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px">$1</code>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.06);padding:1px 5px;border-radius:4px;font-family:monospace;font-size:12px;color:#e2e8f0">$1</code>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#3370ff">$1</a>')
     .replace(/\n/g, '<br/>');
 
