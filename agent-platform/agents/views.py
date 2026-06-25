@@ -698,6 +698,67 @@ class CronJobViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = StandardPagination
 
 
+
+@api_view(["GET"])
+def task_unified_list(request):
+    """统一任务列表 — 包含 Agent Tasks + ParentTasks"""
+    from .models import Task, ParentTask, TaskNode
+    from django.contrib.auth.models import User
+    
+    user = request.user
+    is_admin = user.is_authenticated and user.is_staff
+    
+    result = []
+    
+    # Agent Tasks
+    tasks_qs = Task.objects.select_related("agent", "parent_task").order_by("-created_at")
+    if is_admin:
+        pass
+    elif user.is_authenticated:
+        tasks_qs = tasks_qs.filter(parent_task__conversation__user=user)
+    else:
+        tasks_qs = tasks_qs.none()
+    
+    for t in tasks_qs[:50]:
+        result.append({
+            "id": f"task-{t.id}",
+            "type": "agent_task",
+            "title": t.title or "",
+            "description": t.description or "",
+            "status": t.status or "pending",
+            "agent_name": t.agent.name if t.agent else "",
+            "created_at": str(t.created_at),
+        })
+    
+    # ParentTasks
+    pts_qs = ParentTask.objects.select_related("conversation__user").order_by("-id")
+    if is_admin:
+        pass
+    elif user.is_authenticated:
+        pts_qs = pts_qs.filter(conversation__user=user)
+    else:
+        pts_qs = pts_qs.none()
+    
+    for pt in pts_qs[:50]:
+        nodes = TaskNode.objects.filter(parent_task=pt)
+        result.append({
+            "id": f"pt-{pt.id}",
+            "type": "parent_task",
+            "title": pt.user_message[:60] if pt.user_message else "(无消息)",
+            "status": pt.status or "pending",
+            "agent_name": "云枢",
+            "node_count": nodes.count(),
+            "running_nodes": nodes.filter(status="running").count(),
+            "failed_nodes": nodes.filter(status="failed").count(),
+            "done_nodes": nodes.filter(status="done").count(),
+            "created_at": str(pt.created_at),
+        })
+    
+    result.sort(key=lambda x: x["created_at"], reverse=True)
+    return Response(result[:50])
+
+
+
 # ═══════════════════════════════════════════════
 # Conversation & Message ViewSets
 # ═══════════════════════════════════════════════

@@ -19,6 +19,7 @@ router.register(r'files', views.UploadedFileViewSet)
 app_name = 'agents'
 
 urlpatterns = [
+    path('tasks/unified/', views.task_unified_list, name='task-unified-list'),
     path('', include(router.urls)),
     path('events/', sse.event_stream, name='event-stream'),
     path('system/workers/', views.system_workers, name='system-workers'),
