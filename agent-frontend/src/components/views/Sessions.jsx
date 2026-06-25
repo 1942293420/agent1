@@ -105,6 +105,7 @@ export default function Sessions() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [msgFiles, setMsgFiles] = useState({});
   const messagesEnd = useRef(null);
   const chatContainer = useRef(null);
   const scrollPositions = useRef({});
@@ -245,10 +246,23 @@ export default function Sessions() {
   const sendMessage = async () => {
     if (!input.trim() || !active || sending) return;
     setSending(true);
-    const text = input;
+    let text = input;
     setInput('');
+
+    const pendingFiles = [...uploadedFiles];
+    if (pendingFiles.length > 0) {
+      const fileLinks = pendingFiles
+        .filter(f => f.file)
+        .map(f => `[📎 ${f.original_name}](${f.file.startsWith('http') ? f.file : window.location.origin + f.file})`).join('\n');
+      if (fileLinks) text += '\n\n---\n📁 **已上传文件：**\n' + fileLinks;
+      setUploadedFiles([]);
+    }
+
     try {
-      await api.post('/messages/', { conversation: active, role: 'user', content: text });
+      const msg = await api.post('/messages/', { conversation: active, role: 'user', content: text });
+      if (pendingFiles.length > 0) {
+        setMsgFiles(prev => ({ ...prev, [msg.id]: pendingFiles }));
+      }
       const data = await api.get('/conversations/' + active + '/');
       setMessages(data.messages || []);
       setSessions(prev => prev.map(s => s.id === data.id
@@ -583,6 +597,19 @@ export default function Sessions() {
                                     {msg.role === 'user' && msg.metadata ? (
                                       (() => { try { const m = JSON.parse(msg.metadata); if (m.html) return <div dangerouslySetInnerHTML={{ __html: m.html }} />; } catch {} return renderContent(msg.content); })()
                                     ) : renderContent(msg.content)}
+
+                                    {/* File attachments */}
+                                    {msgFiles[msg.id] && msgFiles[msg.id].length > 0 && (
+                                      <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:4}}>
+                                        {msgFiles[msg.id].map(f => (
+                                          <a key={f.id} href={f.file} target="_blank" rel="noopener noreferrer"
+                                            style={{fontSize:11,color:'#3370ff',textDecoration:'none',display:'flex',alignItems:'center',gap:4,
+                                              background:'rgba(51,112,255,0.06)',padding:'4px 8px',borderRadius:6}}>
+                                            📎 {f.original_name} <span style={{color:'#8f959e'}}>{(f.size/1024).toFixed(0)}KB</span>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ))}
@@ -602,18 +629,6 @@ export default function Sessions() {
                       </button>
                     )}
                   </div>
-
-                  {/* Uploaded files preview */}
-                  {uploadedFiles.length > 0 && (
-                    <div style={{padding:'0 16px 8px',display:'flex',gap:6,flexWrap:'wrap'}}>
-                      {uploadedFiles.map(f => (
-                        <span key={f.id} style={{fontSize:10,padding:'3px 8px',background:'rgba(51,112,255,0.08)',border:'1px solid rgba(51,112,255,0.2)',borderRadius:10,color:'#3370ff',cursor:'pointer'}}
-                          onClick={() => window.open(f.file, '_blank')}>
-                          📎 {f.original_name?.slice(0,25)}{(f.size > 1024 ? ` ${(f.size/1024).toFixed(0)}KB` : '')}
-                        </span>
-                      ))}
-                    </div>
-                  )}
 
                   {/* Drag zone */}
                   <div

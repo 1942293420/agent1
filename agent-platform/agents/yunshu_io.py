@@ -216,8 +216,8 @@ class YunshuCommandHandler:
         if _HAS_DJANGO:
             try:
                 pt = ParentTask.objects.select_related('conversation__user').get(pk=self.parent_id)
-                if pt.conversation and pt.conversation.user and not pt.conversation.user.is_staff:
-                    tools = "web,feishu_doc,feishu_drive"
+                if pt.conversation and pt.conversation.user:
+                    # 沙箱隔离：非admin用户限定工作目录，但工具权限相同
                     work_dir = f"/home/jiangli/sandboxes/user_{pt.conversation.user.id}"
                     os.makedirs(work_dir, exist_ok=True)
             except Exception:
