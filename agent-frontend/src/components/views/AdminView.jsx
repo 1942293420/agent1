@@ -155,7 +155,6 @@ export default function AdminView({ addToast }) {
             <thead><tr>
               <th style={styles.th}>用户名</th><th style={styles.th}>状态</th><th style={styles.th}>角色</th>
               <th style={styles.th}>密码</th>
-              <th style={styles.th}>密码</th>
               <th style={styles.th}>注册时间</th><th style={styles.th}>最后登录</th><th style={styles.th}>操作</th>
             </tr></thead>
             <tbody>
@@ -164,6 +163,14 @@ export default function AdminView({ addToast }) {
                   <td style={{ ...styles.td, color: '#e8f0fe', fontWeight: 500 }}>{u.username}</td>
                   <td style={styles.td}>{u.is_active ? <span style={{ ...styles.badge, ...styles.badgeActive }}>已激活</span> : <span style={{ ...styles.badge, ...styles.badgePending }}>待审批</span>}</td>
                   <td style={{ ...styles.td, color: u.is_staff ? '#c084fc' : '#8ba0b8' }}>{u.is_staff ? '管理员' : '普通用户'}</td>
+                  <td style={{ ...styles.td, color: '#4d6178', fontSize: 11 }}>
+                    {u.password ? (
+                      <span style={{ cursor: 'pointer', userSelect: 'none' }}
+                        onClick={e => { e.currentTarget.textContent = e.currentTarget.textContent === '••••••' ? u.password : '••••••'; }}>
+                        ••••••
+                      </span>
+                    ) : '-'}
+                  </td>
                   <td style={{ ...styles.td, color: '#62666d', fontSize: 12 }}>{u.date_joined ? new Date(u.date_joined).toLocaleDateString('zh-CN') : '-'}</td>
                   <td style={{ ...styles.td, color: '#62666d', fontSize: 12 }}>{u.last_login ? new Date(u.last_login).toLocaleString('zh-CN') : '从未登录'}</td>
                   <td style={styles.td}>
