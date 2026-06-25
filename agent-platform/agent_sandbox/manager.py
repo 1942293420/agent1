@@ -41,6 +41,11 @@ class SandboxManager:
     def _create(self, user_id: int) -> SandboxSession:
         workspace = self.ensure_sandbox_dir(user_id)
 
+        # 清理旧记录（避免 container_name UNIQUE 冲突）
+        SandboxSession.objects.filter(
+            user_id=user_id, status__in=['destroyed', 'stopped', 'error']
+        ).delete()
+
         session = SandboxSession.objects.create(
             user_id=user_id,
             container_name=f"sandbox-user-{user_id}",

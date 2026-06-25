@@ -94,9 +94,11 @@ export default function Sidebar({ view, onViewChange, collapsed, onToggle, mobil
         <div className="resource-bar"><div className="resource-fill cpu" style={{width:`${Math.min(activeWorkers * 25, 100)}%`}} /></div>
         <div style={{fontSize:10,color:'var(--text-muted)',marginBottom:8}}>{activeWorkers}/{workers.length} 活跃</div>
         <div className="user-area">
-          <div className="user-avatar">{user?.username?.[0]?.toUpperCase() || 'A'}</div>
+          {user?.display_name && (
+            <div className="user-avatar">{user.display_name[0]?.toUpperCase()}</div>
+          )}
           <div className="user-info">
-            <span className="user-name">{user?.username || 'Admin'}</span>
+            <span className="user-name">{user?.display_name || user?.username || 'Admin'}</span>
             <span className="user-role">{user?.is_staff ? '管理员' : '用户'}</span>
           </div>
           <button className="sidebar-logout-btn" onClick={handleLogout} title="退出登录">

@@ -1352,9 +1352,21 @@ def whoami_view(request):
                 'id': request.user.id,
                 'username': request.user.username,
                 'is_staff': request.user.is_staff,
+                'display_name': request.user.first_name or '',
             }
         })
     return Response({'authenticated': False})
+
+@api_view(['POST'])
+def profile_update(request):
+    """更新个人资料"""
+    if not request.user.is_authenticated:
+        return Response({'error': '未登录'}, status=401)
+    display_name = request.data.get('display_name', '').strip()
+    request.user.first_name = display_name[:30]
+    request.user.save(update_fields=['first_name'])
+    return Response({'ok': True, 'display_name': display_name[:30]})
+
 
 @csrf_exempt
 @api_view(["POST"])

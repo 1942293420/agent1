@@ -844,7 +844,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .topbar-v2-logo{display:flex;align-items:center;gap:8px;cursor:pointer;padding:0 12px;margin-right:4px;transition:opacity var(--transition);flex-shrink:0}
 .topbar-v2-logo:hover{opacity:.8}
 .topbar-v2-brand{font-size:15px;font-weight:600;color:var(--text-primary);letter-spacing:.5px}
-.topbar-v2-nav{display:flex;align-items:center;gap:2px;flex:1;overflow-x:auto}
+.topbar-v2-nav{display:flex;align-items:center;gap:2px;flex:1}
 .topbar-v2-nav::-webkit-scrollbar{height:0}
 .topbar-v2-nav-item{display:flex;align-items:center;gap:6px;padding:6px 12px;background:none;border:none;color:var(--text-secondary);font-size:12px;font-weight:500;border-radius:6px;cursor:pointer;transition:all var(--transition);white-space:nowrap;font-family:var(--font-sans)}
 .topbar-v2-nav-item:hover{background:var(--bg-hover);color:var(--text-primary)}
@@ -866,6 +866,10 @@ textarea.form-input{resize:vertical;min-height:80px}
 .topbar-v2-dropdown-item:hover{background:var(--bg-hover);color:var(--text-primary)}
 .topbar-v2-dropdown-danger:hover{color:var(--red);background:var(--red-dim)}
 .topbar-v2-dropdown-divider{height:1px;background:var(--border-subtle);margin:4px 0}
+
+/* System hover dropdown */
+.topbar-v2-sys-wrap{position:relative;display:flex}
+.topbar-v2-dropdown-sys{left:0;right:auto}
 
 @media(max-width:768px){
   .topbar-v2-nav{display:none}

@@ -210,13 +210,16 @@ class YunshuCommandHandler:
                 import sys
                 print(f"[YunshuIO] TaskNode SPAWN link failed: {e}", file=sys.stderr)
 
-        # ── 权限控制：非 staff 用户禁止 terminal/file ──
+        # ── 权限控制：staff用项目目录，非staff禁terminal/file+沙箱隔离 ──
         tools = "terminal,file,web,feishu_doc,feishu_drive"
+        work_dir = os.path.expanduser("~/projects")
         if _HAS_DJANGO:
             try:
                 pt = ParentTask.objects.select_related('conversation__user').get(pk=self.parent_id)
                 if pt.conversation and pt.conversation.user and not pt.conversation.user.is_staff:
                     tools = "web,feishu_doc,feishu_drive"
+                    work_dir = f"/home/jiangli/sandboxes/user_{pt.conversation.user.id}"
+                    os.makedirs(work_dir, exist_ok=True)
             except Exception:
                 pass
 
@@ -226,7 +229,7 @@ class YunshuCommandHandler:
              "-p", agent, "-Q", "--yolo",
              "-t", tools],
             bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            cwd=os.path.expanduser("~")
+            cwd=work_dir, env={**os.environ, "HOME": work_dir}
         )
 
         with self._children_lock:

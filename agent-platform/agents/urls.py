@@ -39,6 +39,7 @@ urlpatterns = [
     path('auth/login/', views.login_view, name='auth-login'),
     path('auth/logout/', views.logout_view, name='auth-logout'),
     path('auth/whoami/', views.whoami_view, name='auth-whoami'),
+    path('auth/profile/', views.profile_update, name='auth-profile'),
     path('auth/register/', views.register_view, name='auth-register'),
     # Admin — 用户管理
     path('admin/users/', views.admin_list_users, name='admin-list-users'),

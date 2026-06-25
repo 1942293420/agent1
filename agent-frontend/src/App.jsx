@@ -22,6 +22,7 @@ const TokensView = lazy(() => import('./components/views/Tokens'));
 const MonitorView = lazy(() => import('./components/views/Monitor'));
 const OutputView = lazy(() => import('./components/views/OutputView'));
 const ProfileView = lazy(() => import('./components/views/ProfileView'));
+const AdminView = lazy(() => import('./components/views/AdminView'));
 
 // ── Context ──
 function PageLoader() {
@@ -117,6 +118,7 @@ function AppInner() {
                 <Route path="/monitor" element={<MonitorView />} />
                 <Route path="/output" element={<OutputView />} />
                 <Route path="/profile" element={<ProfileView />} />
+                <Route path="/admin" element={<AdminView />} />
                 <Route path="*" element={<Dashboard />} />
               </Routes>
             </Suspense>
