@@ -26,6 +26,7 @@ export default function Topbar({ onMobileOpen }) {
   const currentView = location.pathname.replace('/', '') || 'dashboard';
   const [menuOpen, setMenuOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
   const menuRef = useRef(null);
   const sysTimer = useRef(null);
 
@@ -48,14 +49,14 @@ export default function Topbar({ onMobileOpen }) {
   return (
     <header className="topbar-v2">
       <div className="topbar-v2-left">
-        <button className="mobile-menu-btn" onClick={onMobileOpen} aria-label="菜单">
+        <button className="mobile-menu-btn" onClick={() => setMobileNav(p => !p)} aria-label="菜单">
           <svg viewBox="0 0 20 20" fill="none" width="20" height="20"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
         </button>
         <div className="topbar-v2-logo" onClick={() => navigate('/')}>
           <svg viewBox="0 0 32 32" fill="none" width="28" height="28"><polygon points="16,2 30,10 30,22 16,30 2,22 2,10" fill="none" stroke="#00d4ff" strokeWidth="1.5"/><circle cx="16" cy="16" r="3" fill="#00d4ff"/></svg>
           <span className="topbar-v2-brand">AgentOS</span>
         </div>
-        <nav className="topbar-v2-nav">
+        <nav className={`topbar-v2-nav${mobileNav ? ' mobile-open' : ''}`}>
           {NAV_ITEMS.map(item => (
             <button key={item.key} className={`topbar-v2-nav-item${currentView === item.key ? ' active' : ''}`} onClick={() => navTo(item.key)}>
               <span className="topbar-v2-nav-icon">{item.icon}</span>

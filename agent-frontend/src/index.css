@@ -312,9 +312,9 @@ html, body { height: 100%; overflow: hidden; }
 .memory-meta{font-size:10px;color:var(--text-muted);margin-top:4px}
 
 /* ─── Sessions ─── */
-/* Lock sessions page — centere, no outer scrolling */
-.view-container:has(.session-layout){overflow:hidden;padding:16px 20px;display:flex;align-items:stretch;justify-content:center}
-.session-layout{display:flex;gap:0;width:100%;max-width:1400px;height:calc(100vh - 84px);overflow:hidden;margin:0 auto}
+/* Lock sessions page — no outer scrolling */
+.session-view-container{overflow:hidden;padding:12px 20px 0;display:flex;align-items:flex-start;justify-content:center}
+.session-layout{display:flex;gap:0;width:100%;max-width:1400px;height:calc(100vh - 64px);overflow:hidden;margin:0 auto;flex-shrink:0}
 .session-list-panel{display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding:0 8px}
 .session-list-panel::-webkit-scrollbar{width:3px}
 .session-item{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all var(--transition);position:relative}
@@ -533,79 +533,164 @@ textarea.form-input{resize:vertical;min-height:80px}
 .sidebar-backdrop{position:fixed;inset:0;z-index:199;background:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .25s,visibility .25s}
 .sidebar-backdrop.show{opacity:1;visibility:visible}
 
-/* ─── Responsive ─── */
+/* ─── Responsive — v2 (topbar-based) ─── */
+
+/* 1024px — compact nav */
 @media(max-width:1024px){
-  .sidebar{width:60px;min-width:60px}
-  .sidebar .nav-label,.sidebar .nav-badge,.sidebar .logo-text,.sidebar .sidebar-footer .user-info,
-  .sidebar .resource-label,.sidebar .resource-bar,.sidebar .system-status .status-text,
-  .sidebar .system-status .status-time,.sidebar .nav-section-label{display:none}
-  .sidebar .sidebar-toggle{display:none}
-  .sidebar .nav-item{justify-content:center;padding:10px 8px}
-  .sidebar .nav-icon{margin:0}
-  .sidebar .sidebar-header{justify-content:center;padding:0 8px}
-  .sidebar .system-status{justify-content:center}
-  .sidebar .user-area{justify-content:center}
-  .sidebar .user-avatar{margin:0}
+  .topbar-v2-nav-label{display:none}
+  .topbar-v2-nav-item{padding:6px 10px}
+  .topbar-v2-brand{font-size:14px}
   .metrics-grid{grid-template-columns:repeat(3,1fr)}
   .dashboard-bottom{grid-template-columns:1fr}
 }
-@media(max-width:640px){
-  html, body { height: 100%; overflow: auto; -webkit-overflow-scrolling: touch; }
-  #root { display: flex; flex-direction: column; min-height: 100%; }
-  .sidebar{width:220px;min-width:220px;position:fixed;left:0;top:0;bottom:0;z-index:200;transform:translateX(-100%);transition:transform .25s ease;height:100dvh}
-  .sidebar .nav-label,.sidebar .nav-badge,.sidebar .logo-text,.sidebar .sidebar-footer .user-info,
-  .sidebar .resource-label,.sidebar .resource-bar,.sidebar .system-status .status-text,
-  .sidebar .system-status .status-time,.sidebar .nav-section-label{display:flex}
-  .sidebar.mobile-open{transform:translateX(0);box-shadow:0 0 60px rgba(0,0,0,.6)}
+
+/* 768px — tablet: stack sessions, hamburger menu */
+@media(max-width:768px){
+  .topbar-v2-nav{display:none;position:absolute;top:100%;left:0;right:0;background:rgba(13,19,32,.98);border-bottom:1px solid var(--border-subtle);flex-direction:column;padding:8px;z-index:99}
+  .topbar-v2-nav.mobile-open{display:flex}
+  .topbar-v2-right{display:flex}
   .mobile-menu-btn{display:flex}
   .metrics-grid{grid-template-columns:repeat(2,1fr)}
-  .search-box{display:none}
-  .main-content{min-height:100dvh;overflow:visible;display:block}
-  .view-container{overflow:visible;padding:12px}
-  .log-terminal{height:400px}
+  .view-container{padding:8px;overflow:hidden}
+  .session-view-container{padding:0;display:flex;flex-direction:column;flex:1;min-height:0}
+  .session-layout{flex-direction:column;height:auto;max-width:100%;flex:1}
+  .session-list-panel{max-height:120px;width:100%!important;min-width:100%!important;border-radius:0;padding:8px;flex-shrink:0;overflow-y:auto}
+  .session-detail-panel{flex:1;min-height:0;border-radius:0;display:flex;flex-direction:column}
+  .session-detail-panel.light{border-radius:0}
+  .session-detail-panel .session-messages{flex:1;overflow-y:auto;min-height:0}
+  .session-input-area{flex-shrink:0}
+  .resize-handle-x{display:none}
+  .output-panel-inline{width:100%!important;min-width:100%!important}
   .detail-panel{width:100%;max-width:100vw}
   .memory-stats{grid-template-columns:repeat(2,1fr)}
-  .session-layout{display:flex;flex-direction:column;height:auto}
-  .session-list-panel{max-height:40vh;overflow-y:auto;width:100%!important;min-width:100%!important;padding:0}
-  .session-detail-panel{flex:1;min-height:0;overflow:visible;border-radius:0}
-  .session-detail-panel.light{border-radius:0}
-  .session-detail-panel .session-messages{overflow-y:visible}
-  .session-messages{padding:12px 16px}
   .settings-layout{grid-template-columns:1fr}
 }
-@media(max-width:480px){
+
+/* 640px — phone: compact mode */
+@media(max-width:640px){
+  html,body{height:100%;overflow:auto;-webkit-overflow-scrolling:touch}
+  #root{display:flex;flex-direction:column;min-height:100%}
+  .topbar-v2{padding:0 8px;height:48px}
+  .topbar-v2-username{display:none}
+  .topbar-v2-logo{padding:0 6px}
+  .topbar-v2-brand{font-size:13px}
+  .topbar-v2-right{gap:4px}
+  .view-container{padding:6px}
+  .session-view-container{padding:0}
+  .session-list-panel{max-height:100px}
+  .session-messages{padding:8px 10px}
+  .session-input-area{padding:6px 8px}
   .metrics-grid{grid-template-columns:1fr}
-  .view-container{padding:14px}
-  .session-messages{padding:10px 12px}
+  .log-terminal{height:300px}
+}
+
+/* 480px — small phone */
+@media(max-width:480px){
+  .topbar-v2{padding:0 6px;height:44px}
+  .view-container{padding:6px}
+  .session-messages{padding:8px 10px}
   .msg-copy-btn{display:none}
   .msg-bubble{max-width:90%}
+  .session-item{padding:10px 12px}
+  .pending-files{padding:2px 8px 0}
 }
 
-/* ─── Mobile: Tables scroll ─── */
+/* ─── Mobile: general component fixes ─── */
 @media(max-width:768px){
-  .view-container table,.card table,.session-detail-panel table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
-  .view-container table th,.view-container table td,.card table th,.card table td{min-width:80px;white-space:nowrap}
-  .topbar{padding:0 12px;gap:6px}
-  .topbar-username{display:none}
-  .topbar-user{border-left:none;padding-left:0;margin-left:0}
-  .topbar-logout-btn{width:32px;height:32px}
-  .notif-dropdown{width:280px;right:-60px;max-height:280px}
-  .sidebar .sidebar-logout-btn{width:36px;height:36px}
-  .detail-panel{width:100%!important;max-width:100vw;right:0}
+  /* Tables — horizontal scroll */
+  .data-table,.rich-table,.view-container table,.card table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  .data-table th,.rich-table th,.view-container table th{min-width:70px}
   .admin-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .admin-table-wrap table{min-width:600px}
-  .card-header{flex-wrap:wrap;gap:8px}
+  
+  /* Cards and grids */
+  .card-grid{grid-template-columns:1fr!important}
+  .agent-card{width:100%}
+  .skill-card{width:100%}
+  .card-header{flex-wrap:wrap;gap:6px}
+  .card-body{padding:12px}
   .view-actions{width:100%}
-  .view-header{flex-direction:column;align-items:flex-start}
+  .view-header{flex-direction:column;align-items:flex-start;gap:8px;padding:12px 16px}
+  .view-title{font-size:16px}
+  
+  /* Dashboard */
+  .metrics-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat-card{padding:14px 12px}
+  .stat-number{font-size:22px}
+  .dashboard-bottom{grid-template-columns:1fr}
+  
+  /* Modal */
+  .modal{width:95%;max-width:95vw;min-width:auto;padding:16px}
+  .modal-header{padding:0 0 12px}
+  .modal-title{font-size:15px}
+  .modal-footer{gap:8px}
+  
+  /* Forms — full width + prevent iOS zoom */
+  .form-row{flex-direction:column;gap:10px}
+  .form-group{width:100%}
+  .form-input,.form-select{font-size:16px;padding:10px 12px}
+  .form-label{font-size:12px}
+  
+  /* Touch targets — 44px min */
+  .btn{padding:8px 16px;min-height:40px}
+  .btn-ghost{padding:6px 12px;min-height:36px}
+  .topbar-v2-nav-item{min-height:36px}
+  
+  /* Detail panel */
+  .detail-panel{width:100%!important;max-width:100vw;right:0}
+  .detail-header{padding:14px 16px}
+  .detail-kv{grid-template-columns:1fr;gap:2px}
+  .detail-section{padding:12px 0}
+  
+  /* Tasks page */
+  .task-list-item{flex-wrap:wrap;gap:8px}
+  .task-list-actions{width:100%;justify-content:flex-end}
+  .filter-bar{flex-wrap:wrap;gap:6px}
+  .filter-label{display:none}
   .filter-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  
+  /* Agents page */
+  .agents-grid{grid-template-columns:1fr!important}
+  
+  /* Skills page */
+  .skills-grid{grid-template-columns:1fr!important}
+  
+  /* Memory page */
   .memory-stats{grid-template-columns:repeat(2,1fr)}
+  .memory-card{padding:12px}
+  
+  /* Workers page */
+  .worker-card{padding:12px}
+  
+  /* Settings */
   .settings-layout{grid-template-columns:1fr}
+  .settings-sidebar{position:static;border-right:none;border-bottom:1px solid var(--border-subtle);display:flex;overflow-x:auto;gap:8px;padding:8px 0}
+  .settings-sidebar-item{white-space:nowrap;flex-shrink:0}
+  
+  /* Output panel */
+  .output-layout{height:auto;min-height:70vh}
+  .output-editor,.output-preview{min-height:50vh}
+  
+  /* Profile */
+  .profile-avatar-section{padding:20px 0 16px}
+  .profile-form{padding:0}
+  
+  /* Admin */
+  .admin-user-card{flex-wrap:wrap}
+  
+  /* Logs / Monitor */
+  .log-terminal{height:50vh}
+  .monitor-grid{grid-template-columns:1fr}
 }
 
-@media(max-width:480px){
-  .topbar{padding:0 8px}
-  .breadcrumb{font-size:12px}
+@media(max-width:640px){
+  .metrics-grid{grid-template-columns:1fr}
   .memory-stats{grid-template-columns:1fr}
+  .stat-card{padding:10px}
+  .view-header{padding:10px 12px}
+  .view-container{padding:8px}
+  .btn{padding:6px 12px;font-size:12px}
+  .breadcrumb{font-size:12px}
   .notif-dropdown{width:260px;right:-80px}
   .btn,.topbar-btn{min-height:36px}
 }

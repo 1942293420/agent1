@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api';
 import { useApp } from '../../AppContext';
 import MessageRenderer from '../chat/MessageRenderer';
-import '../chat/MessageRenderer.css';
+import '../chat/messageStyles.css';
 
 const MSG_GAP_MINUTES = 5;
 
@@ -439,7 +439,7 @@ export default function Sessions() {
   const msgGroups = buildMessageGroups();
 
   return (
-    <>
+    <div className="session-view-container">
       <div className="session-layout">
         {/* Session list — resizable */}
         <div className="session-list-panel light" style={{ width: listResize.size, minWidth: listResize.size, flexShrink: 0 }}>
@@ -779,6 +779,6 @@ export default function Sessions() {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
