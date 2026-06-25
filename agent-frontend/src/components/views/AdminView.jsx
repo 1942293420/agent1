@@ -164,9 +164,18 @@ export default function AdminView({ addToast }) {
                   <td style={styles.td}>{u.is_active ? <span style={{ ...styles.badge, ...styles.badgeActive }}>已激活</span> : <span style={{ ...styles.badge, ...styles.badgePending }}>待审批</span>}</td>
                   <td style={{ ...styles.td, color: u.is_staff ? '#c084fc' : '#8ba0b8' }}>{u.is_staff ? '管理员' : '普通用户'}</td>
                   <td style={{ ...styles.td, color: '#4d6178', fontSize: 11 }}>
-                    {u.password ? (
+                    {u.has_password ? (
                       <span style={{ cursor: 'pointer', userSelect: 'none' }}
-                        onClick={e => { e.currentTarget.textContent = e.currentTarget.textContent === '••••••' ? u.password : '••••••'; }}>
+                        onClick={async e => {
+                          const el = e.currentTarget;
+                          if (el.textContent !== '••••••') { el.textContent = '••••••'; return; }
+                          el.textContent = '...';
+                          try {
+                            const res = await adminFetch('/api/admin/users/' + u.id + '/decrypt-password/', { method: 'POST' });
+                            const d = await res.json();
+                            el.textContent = res.ok ? d.password : (d.error || '失败');
+                          } catch { el.textContent = '失败'; }
+                        }}>
                         ••••••
                       </span>
                     ) : '-'}
@@ -208,7 +217,16 @@ export default function AdminView({ addToast }) {
               <div className="admin-mobile-card-row">
                 <span className="label">密码</span>
                 <span className="value" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}
-                  onClick={e => { e.currentTarget.textContent = e.currentTarget.textContent === '••••••' ? (u.password || '-') : '••••••'; }}>
+                  onClick={async e => {
+                    const el = e.currentTarget;
+                    if (el.textContent !== '••••••') { el.textContent = '••••••'; return; }
+                    el.textContent = '...';
+                    try {
+                      const res = await adminFetch('/api/admin/users/' + u.id + '/decrypt-password/', { method: 'POST' });
+                      const d = await res.json();
+                      el.textContent = res.ok ? d.password : (d.error || '失败');
+                    } catch { el.textContent = '失败'; }
+                  }}>
                   ••••••
                 </span>
               </div>

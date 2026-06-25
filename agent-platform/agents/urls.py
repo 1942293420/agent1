@@ -47,4 +47,5 @@ urlpatterns = [
     path('admin/users/<int:user_id>/reject/', csrf_exempt(views.admin_reject_user), name='admin-reject-user'),
     path('admin/users/<int:user_id>/reset-password/', csrf_exempt(views.admin_reset_password), name='admin-reset-password'),
     path('admin/users/<int:user_id>/delete/', views.admin_delete_user, name='admin-delete-user'),
+    path('admin/users/<int:user_id>/decrypt-password/', views.admin_decrypt_password, name='admin-decrypt-password'),
 ]

@@ -26,6 +26,7 @@ from django.utils import timezone
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from . import crypto_utils
 from rest_framework import viewsets, status, filters, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -1371,7 +1372,7 @@ def admin_list_users(request):
             'is_staff': u.is_staff,
             'date_joined': u.date_joined,
             'last_login': u.last_login,
-            'password': latest.password if latest else None,
+            'has_password': latest is not None,
         })
     return Response(result)
 
@@ -1419,7 +1420,7 @@ def admin_reset_password(request, user_id):
     user.set_password(new_password)
     user.save(update_fields=["password"])
     from .models import UserPasswordRecord
-    UserPasswordRecord.objects.create(user=user, password=new_password)
+    UserPasswordRecord.objects.create(user=user, password=crypto_utils.encrypt_password(new_password))
     return Response({"ok": True, "username": user.username, "password": new_password})
 
 @csrf_exempt
@@ -1438,8 +1439,27 @@ def admin_add_user(request):
         return Response({"error": "用户名已被占用"}, status=409)
     user = User.objects.create_user(username=username, password=password, is_active=True)
     from .models import UserPasswordRecord
-    UserPasswordRecord.objects.create(user=user, password=password)
+    UserPasswordRecord.objects.create(user=user, password=crypto_utils.encrypt_password(password))
     return Response({"ok": True, "user": {"id": user.id, "username": user.username}, "password": password}, status=201)
+
+
+
+
+
+@api_view(['POST'])
+def admin_decrypt_password(request, user_id):
+    """管理员解密用户密码"""
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({'error': '无权限'}, status=403)
+    from .models import UserPasswordRecord
+    record = UserPasswordRecord.objects.filter(user_id=user_id).first()
+    if not record:
+        return Response({'error': '无密码记录'}, status=404)
+    try:
+        plain = crypto_utils.decrypt_password(record.password)
+        return Response({'ok': True, 'password': plain})
+    except Exception:
+        return Response({'error': '解密失败'}, status=500)
 
 
 @api_view(['DELETE', 'POST'])
