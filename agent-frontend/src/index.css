@@ -400,6 +400,19 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 .msg-file-badge:hover .msg-file-delete{display:flex}
 .msg-file-delete:hover{background:#c0392b}
 
+/* Pending file chips above input */
+.pending-files{display:flex;gap:6px;flex-wrap:wrap;padding:4px 16px 0}
+.pending-file-chip{font-size:10px;padding:3px 8px;background:rgba(51,112,255,0.08);border:1px solid rgba(51,112,255,0.2);border-radius:10px;color:#3370ff;display:inline-flex;align-items:center;gap:4px;position:relative}
+.pending-file-remove{width:14px;height:14px;border-radius:50%;background:#e24b4a;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:none;align-items:center;justify-content:center;margin-left:2px}
+.pending-file-chip:hover .pending-file-remove{display:inline-flex}
+.pending-file-remove:hover{background:#c0392b}
+
+/* Attached files inside input area */
+.input-files{display:flex;gap:4px;flex-wrap:wrap;padding:4px 8px 0;border-top:1px solid #f0f0f0}
+.input-file-tag{font-size:10px;padding:2px 6px;background:rgba(51,112,255,0.12);border:1px solid #3370ff;border-radius:8px;color:#3370ff;display:inline-flex;align-items:center;gap:3px}
+.input-file-untag{width:14px;height:14px;border-radius:50%;background:#e24b4a;color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:none;align-items:center;justify-content:center}
+.input-file-tag:hover .input-file-untag{display:inline-flex}
+
 /* ─── Logs ─── */
 .log-terminal{font-family:var(--font-mono);font-size:11px;background:#050a10;border-radius:var(--radius-sm);padding:14px;height:calc(100vh - 240px);overflow-y:auto;line-height:1.7}
 .log-terminal::-webkit-scrollbar{width:3px}

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api';
 import { useApp } from '../../AppContext';
+import MessageRenderer from '../chat/MessageRenderer';
+import '../chat/messageStyles.css';
 
 const MSG_GAP_MINUTES = 5;
 
@@ -105,6 +107,7 @@ export default function Sessions() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [attachedFiles, setAttachedFiles] = useState([]);  // files in input that will be sent
   const [msgFiles, setMsgFiles] = useState({});
   const messagesEnd = useRef(null);
   const chatContainer = useRef(null);
@@ -249,13 +252,13 @@ export default function Sessions() {
     let text = input;
     setInput('');
 
-    const pendingFiles = [...uploadedFiles];
+    const pendingFiles = [...attachedFiles];
     if (pendingFiles.length > 0) {
       const fileLinks = pendingFiles
         .filter(f => f.file)
         .map(f => `[📎 ${f.original_name}](${f.file.startsWith('http') ? f.file : window.location.origin + f.file})`).join('\n');
       if (fileLinks) text += '\n\n---\n📁 **已上传文件：**\n' + fileLinks;
-      setUploadedFiles([]);
+      setAttachedFiles([]);
     }
 
     try {
@@ -354,6 +357,7 @@ export default function Sessions() {
     }
     if (uploaded.length > 0) {
       setUploadedFiles(prev => [...prev, ...uploaded]);
+      setAttachedFiles(prev => [...prev, ...uploaded]);
       addToast(`已上传 ${uploaded.length} 个文件`, 'success');
     }
     setUploading(false);
@@ -595,8 +599,8 @@ export default function Sessions() {
                                       )}
                                     </button>
                                     {msg.role === 'user' && msg.metadata ? (
-                                      (() => { try { const m = JSON.parse(msg.metadata); if (m.html) return <div dangerouslySetInnerHTML={{ __html: m.html }} />; } catch {} return renderContent(msg.content); })()
-                                    ) : renderContent(msg.content)}
+                                      (() => { try { const m = JSON.parse(msg.metadata); if (m.html) return <div dangerouslySetInnerHTML={{ __html: m.html }} />; } catch {} return <MessageRenderer content={msg.content} />; })()
+                                    ) : <MessageRenderer content={msg.content} />}
 
                                     {/* File attachments */}
                                     {msgFiles[msg.id] && msgFiles[msg.id].length > 0 && (
@@ -658,12 +662,54 @@ export default function Sessions() {
                     <div>📁 拖放文件到此处上传</div>
                   </div>
 
+                  {/* Uploaded files history — click to re-attach */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="pending-files">
+                      {uploadedFiles.map(f => (
+                        <span key={f.id} className="pending-file-chip"
+                          onClick={() => {
+                            setAttachedFiles(prev => prev.some(x => x.id === f.id) ? prev : [...prev, f]);
+                          }}
+                          title="点击附加到本次消息"
+                        >
+                          📎 {f.original_name?.slice(0,28)}{(f.size > 1024 ? ` ${(f.size/1024).toFixed(0)}KB` : '')}
+                          <button
+                            className="pending-file-remove"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try { await api.delete('/files/' + f.id + '/'); } catch {}
+                              setUploadedFiles(prev => prev.filter(x => x.id !== f.id));
+                              setAttachedFiles(prev => prev.filter(x => x.id !== f.id));
+                            }}
+                            title="删除文件"
+                          >×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Input */}
                   <div className="session-input-area">
                     <input type="file" id="file-upload-input" multiple style={{display:'none'}} onChange={handleFileSelect} />
                     <label htmlFor="file-upload-input" className={`attach-btn${uploading ? ' uploading' : ''}`} title="上传文件">
                       {uploading ? '⏳' : '📎'}
                     </label>
+                    {/* Attached files inside input */}
+                    {attachedFiles.length > 0 && (
+                      <div className="input-files">
+                        {attachedFiles.map(f => (
+                          <span key={f.id} className="input-file-tag">
+                            📎 {f.original_name?.slice(0,22)}
+                            <button className="input-file-untag"
+                              onClick={() => {
+                                setUploadedFiles(prev => [...prev, f]);
+                                setAttachedFiles(prev => prev.filter(x => x.id !== f.id));
+                              }}
+                              title="移除附件">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <textarea
                       placeholder="输入消息..."
                       value={input}
@@ -712,7 +758,7 @@ export default function Sessions() {
                       </div>
                       <div className="output-panel-preview">
                         {outputContent ? (
-                          <div dangerouslySetInnerHTML={{ __html: renderMarkdown(outputContent) }} />
+                          <MessageRenderer content={outputContent} />
                         ) : (
                           <div className="output-empty-hint">
                             <div style={{textAlign:'center'}}>
