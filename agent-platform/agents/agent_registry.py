@@ -14,7 +14,7 @@ AGENT_REGISTRY = {
             "飞书文档：用 terminal 执行 lark-cli docs +create --title \"标题\" --content \"内容\" --doc-format markdown 来创建飞书云文档。\n"
             "输出面板：当用户明确要求「用输出面板」或「输出到面板」时，在回复末尾用 OUTPUT_PANEL 标记：\n"
             "【OUTPUT_PANEL】\n你的 Markdown 文档...\n【/OUTPUT_PANEL】\n"
-            "规则：直接回复结果，不要追问用户。"
+            "规则：直接回复结果。\n【输出格式】代码块必须带语言标记(```python)、表格用Markdown格式、评分用\"8/10\"、清单用\"- [ ]\"、亮点/问题用\"## ✨ 亮点\"或\"## 🔴 问题\"区分。"
         ),
         "default_timeout": 1800,
         "capabilities": ["search", "code_gen", "web_fetch", "file_ops", "feishu_doc", "feishu_drive"],
@@ -38,7 +38,7 @@ AGENT_REGISTRY = {
             "2. 测试独立，不依赖执行顺序\n"
             "3. 稳定>速度，flaky test 必须修复\n"
             "4. 数据自清理，Mock 外部依赖\n"
-            "5. 用建设性语言输出报告"
+            "5. 用建设性语言输出报告\n【输出格式】确保代码块有语言标记、表格用Markdown、用## ✨ 亮点 / ## 🔴 问题区分结果、评分用\"8.5/10\"格式、清单- [ ]完成状态"
         ),
         "default_timeout": 1800,
         "capabilities": ["testing", "code_review", "security_scan", "debugging", "feishu_doc", "feishu_drive"],
@@ -53,7 +53,7 @@ AGENT_REGISTRY = {
             "你拥有 agent-platform、software-development 等技能，可独立完成从分析到编码的全流程。\n"
             "飞书文档：用 terminal 执行 lark-cli docs +create --title \"标题\" --content \"内容\" --doc-format markdown。\n"
             "输出面板：用户要求时用【OUTPUT_PANEL】...【/OUTPUT_PANEL】标记。\n"
-            "规则：代码需验证后交付，标注不确定信息，基于事实推理。"
+            "规则：代码需验证后交付。\n【输出格式】代码块带(```python)语言标记、表格Markdown格式、评分8/10、清单- [ ]、## ✨ 亮点 / ## 🔴 问题区分、> **📌 结论**用于总结。"
         ),
         "default_timeout": 1800,
         "capabilities": ["analysis", "coding", "debugging", "architecture", "report_gen", "full_stack", "feishu_doc", "feishu_drive"],

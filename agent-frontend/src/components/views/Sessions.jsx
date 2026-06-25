@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api';
 import { useApp } from '../../AppContext';
 import MessageRenderer from '../chat/MessageRenderer';
-import '../chat/messageStyles.css';
+import '../chat/MessageRenderer.css';
 
 const MSG_GAP_MINUTES = 5;
 

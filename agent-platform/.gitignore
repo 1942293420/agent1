@@ -50,3 +50,4 @@ checkpoints/
 # ─── OS ───
 .DS_Store
 Thumbs.db
+media/uploads/
