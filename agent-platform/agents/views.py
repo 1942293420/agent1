@@ -699,6 +699,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes = [AgentEndpointPermission]
     pagination_class = StandardPagination
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        # 管理员看全部，普通用户只看自己的
+        if user.is_authenticated and not user.is_staff:
+            qs = qs.filter(user=user)
+        return qs
+
     def get_serializer_class(self):
         if self.action == 'list':
             return ConversationListSerializer
@@ -708,6 +716,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
         agent = serializer.validated_data.get('agent')
         feishu_chat_id = serializer.validated_data.get('feishu_chat_id', '')
 
+        # 绑定当前用户
+        user = None
+        if self.request.user.is_authenticated:
+            user = self.request.user
+
         # 飞书消息：按 feishu_chat_id 匹配
         if feishu_chat_id:
             existing = Conversation.objects.filter(feishu_chat_id=feishu_chat_id).first()
@@ -715,18 +728,13 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 serializer.instance = existing
                 return
 
-        # Web / 非飞书：同一 agent 优先复用任何已有对话（含飞书对话）
-        if agent and not feishu_chat_id:
-            # 优先复用已有的飞书对话（跨端统一）
-            existing = Conversation.objects.filter(agent=agent).first()
+        # Web：同一用户+agent 复用已有对话
+        if agent and not feishu_chat_id and user:
+            existing = Conversation.objects.filter(agent=agent, user=user).first()
             if existing:
                 serializer.instance = existing
                 return
 
-        # 绑定当前 Web 用户（权限控制用）
-        user = None
-        if request.user.is_authenticated:
-            user = request.user
         conversation = serializer.save(user=user)
         Message.objects.create(
             conversation=conversation,
@@ -837,6 +845,13 @@ class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [AgentEndpointPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['conversation', 'role']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_authenticated and not user.is_staff:
+            qs = qs.filter(conversation__user=user)
+        return qs
     pagination_class = StandardPagination
 
     def perform_create(self, serializer):

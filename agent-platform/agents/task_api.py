@@ -10,7 +10,11 @@ from .models import ParentTask, ChildTask, TaskNode, Message
 
 @api_view(['GET'])
 def parent_task_list(request):
-    tasks = ParentTask.objects.order_by('-id')[:50]
+    qs = ParentTask.objects.select_related('conversation__user').order_by('-id')
+    # 普通用户只看自己的任务，管理员看全部
+    if request.user.is_authenticated and not request.user.is_staff:
+        qs = qs.filter(conversation__user=request.user)
+    tasks = qs[:50]
     data = []
     for pt in tasks:
         nodes = TaskNode.objects.filter(parent_task=pt)
