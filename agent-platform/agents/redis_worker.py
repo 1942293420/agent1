@@ -189,7 +189,7 @@ def process_message(msg_id):
     if not parent_id:
         print(f"[Worker] #{msg_id} 创建父任务失败"); return
 
-    _push_msg(conv_id, "✅ 已收到，云枢调度中...", "received")
+    _push_msg(conv_id, f"✅ 已收到，云枢调度中... (任务ID: {parent_id})", "received")
 
     # ── 文本协议：启动云枢，拦截命令 ──
     final_reply = yunshu_io.run_yunshu_session(parent_id, conv_id, user_msg, agent_profile)

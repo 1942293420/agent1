@@ -774,7 +774,7 @@ def _fallback_reply(parent_id, conv_id):
             json={
                 "conversation": conv_id,
                 "role": "system",
-                "content": f"⚠️ 任务执行结束"
+                "content": f"⚠️ 任务执行结束 (任务ID: {parent_id})"
             },
             timeout=10
         )

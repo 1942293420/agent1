@@ -11,6 +11,7 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>window.addEventListener('error',e=>{if(e.message&&e.message.includes('message port closed'))e.stopImmediatePropagation()},true)</script>
     <style>
       @media(max-width:768px) {
         html, body { overflow: auto !important; -webkit-overflow-scrolling: touch !important; height: auto !important; }
