@@ -15,7 +15,9 @@ export default function Skills({ skills, addToast, openDetail }) {
   const filtered = skills.filter(s => {
     if (cat !== '全部' && s.category !== cat) return false;
     if (search && !s.name?.toLowerCase().includes(search.toLowerCase()) &&
-        !s.description?.toLowerCase().includes(search.toLowerCase())) return false;
+        !s.description?.toLowerCase().includes(search.toLowerCase()) &&
+        !s.name_zh?.toLowerCase().includes(search.toLowerCase()) &&
+        !s.description_zh?.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -50,14 +52,14 @@ export default function Skills({ skills, addToast, openDetail }) {
                   <span style={{fontSize:12,fontWeight:600,color:col}}>{icon}</span>
                 </div>
                 <div>
-                  <div className="skill-name">{s.name}</div>
+                  <div className="skill-name">{s.name_zh || s.name}</div>
                   <div style={{fontSize:10,color:'var(--text-muted)'}}>
                     {s.category || 'tools'} · v{s.version || '—'}
                     {s.source && <span> · {s.source}</span>}
                   </div>
                 </div>
               </div>
-              <p className="skill-desc">{(s.description || '').slice(0, 100)}</p>
+              <p className="skill-desc">{(s.description_zh || s.description || '').slice(0, 100)}</p>
               {s.tags && s.tags.length > 0 && (
                 <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                   {s.tags.slice(0,5).map((t,ti) => (

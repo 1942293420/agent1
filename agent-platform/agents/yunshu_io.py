@@ -24,7 +24,7 @@ CMD_PATTERNS = {
     # v3 原有
     "SPAWN_BANNI": re.compile(r"^SPAWN_BANNI\s*:?\s*(.+)", re.I),
     "SPAWN_BASIR": re.compile(r"^SPAWN_BASIR\s*:?\s*(.+)", re.I),
-    "SPAWN_TESTER": re.compile(r"^SPAWN_TESTER\s*:?\s*(.+)", re.I),
+    "SPAWN_YUNHENG": re.compile(r"^SPAWN_YUNHENG\s*:?\s*(.+)", re.I),
     "CHECK":       re.compile(r"^CHECK\s+(\S+)", re.I),
     "WAIT_ALL":    re.compile(r"^WAIT_ALL$", re.I),
     "KILL":        re.compile(r"^KILL\s+(\S+)", re.I),
@@ -519,8 +519,8 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                         response = handler.spawn("banni", m.group(1))
                     elif cmd_name == "SPAWN_BASIR":
                         response = handler.spawn("basir", m.group(1))
-                    elif cmd_name == "SPAWN_TESTER":
-                        response = handler.spawn("tester", m.group(1))
+                    elif cmd_name == "SPAWN_YUNHENG":
+                        response = handler.spawn("yunheng", m.group(1))
                     elif cmd_name == "CHECK":
                         response = handler.check(m.group(1))
                     elif cmd_name == "WAIT_ALL":
@@ -625,6 +625,19 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                     f"禁止输出自检表格，禁止重新 PLAN。"
                 )
 
+            # REFLECT 通过 → 构造 REPLY（不用 system_prompt，避免 PLAN 干扰）
+            elif any("REFLECT_PASS" in r for r in response_lines):
+                results_text = handler.wait_all()
+                context = (
+                    f"# 最终回复\n\n"
+                    f"用户需求：{user_message[:300]}\n\n"
+                    f"## 子任务结果\n{results_text}\n\n"
+                    f"## 指令\n"
+                    f"REFLECT 已通过。根据子任务结果和用户需求，"
+                    f"立即 REPLY 输出最终回答（Markdown格式）。"
+                    f"禁止 SPAWN，禁止 PLAN。"
+                )
+
             # CHECK / 其他
             else:
                 context = f"{system_prompt}\n\n上轮结果：\n" + "\n".join(response_lines)
@@ -708,7 +721,7 @@ complexity: medium
 tasks:
   - id: t1, agent: banni, desc: 简短任务描述(单行), deps: []
   - id: t2, agent: basir, desc: 简短任务描述(单行), deps: [t1]
-  - id: t3, agent: tester, desc: 代码审查和测试, deps: [t1]
+  - id: t3, agent: yunheng, desc: 代码审查和测试, deps: [t1]
 
 ## 输出面板
 用户明确要求「用输出面板」时，在 REPLY 末尾用 OUTPUT_PANEL 标记。平常直接 REPLY 回复即可。格式：

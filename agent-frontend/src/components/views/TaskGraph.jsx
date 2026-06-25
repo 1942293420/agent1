@@ -1,355 +1,182 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
 
-const STATUS_CONFIG = {
-  done:       { bg:'rgba(29,158,117,0.15)', text:'#1D9E75', border:'rgba(29,158,117,0.4)', label:'完成' },
-  running:    { bg:'rgba(55,138,221,0.15)', text:'#378ADD', border:'rgba(55,138,221,0.5)', label:'执行中', pulse: true },
-  pending:    { bg:'rgba(186,117,23,0.12)', text:'#BA7517', border:'rgba(186,117,23,0.3)', label:'等待' },
-  failed:     { bg:'rgba(226,75,74,0.15)',  text:'#E24B4A', border:'rgba(226,75,74,0.5)',  label:'失败' },
-  skipped:    { bg:'rgba(128,128,128,0.10)', text:'#888',      border:'rgba(128,128,128,0.25)', label:'跳过' },
-  timed_out:  { bg:'rgba(226,75,74,0.12)',  text:'#E24B4A', border:'rgba(226,75,74,0.4)',  label:'超时' },
+const AGENT_INFO = {
+  banni:   { name: 'Banni 云筑', stroke: '#22d3ee', fill: 'rgba(8, 51, 68, 0.4)', emoji: '🔍' },
+  basir:   { name: 'Basir 云鉴', stroke: '#a78bfa', fill: 'rgba(76, 29, 149, 0.35)', emoji: '🧠' },
+  tester:  { name: '云衡 测试', stroke: '#fb7185', fill: 'rgba(136, 19, 55, 0.3)', emoji: '🔬' },
+  yunshu:  { name: '云枢 调度', stroke: '#fbbf24', fill: 'rgba(120, 53, 15, 0.3)', emoji: '⚙️' },
 };
 
-const AGENT_COLORS = {
-  banni: '#3370ff',
-  basir: '#7C3AED',
-  yunshu: '#F59E0B',
-  default: '#378ADD',
+const STATUS_COLORS = {
+  done:      { fill: 'rgba(6, 78, 59, 0.4)', stroke: '#34d399', text: '#34d399', label: '✓ 完成' },
+  running:   { fill: 'rgba(8, 51, 68, 0.5)', stroke: '#22d3ee', text: '#22d3ee', label: '▶ 执行中' },
+  pending:   { fill: 'rgba(30, 41, 59, 0.4)', stroke: '#64748b', text: '#94a3b8', label: '○ 等待' },
+  failed:    { fill: 'rgba(136, 19, 55, 0.4)', stroke: '#fb7185', text: '#fb7185', label: '✗ 失败' },
 };
-
-function formatDuration(ms) {
-  if (!ms || ms <= 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms/1000).toFixed(1)}s`;
-  const m = Math.floor(ms / 60000);
-  const s = Math.round((ms % 60000) / 1000);
-  return `${m}m${s}s`;
-}
-
-function NodeCard({ node, isExpanded, onToggle, edges, nodesById }) {
-  const sc = STATUS_CONFIG[node.status] || STATUS_CONFIG.pending;
-  const agentColor = AGENT_COLORS[node.agent_name?.toLowerCase()] || AGENT_COLORS.default;
-
-  const isBlocked = node.status === 'pending' && node.depends_on?.some(dep => {
-    const depNode = nodesById[dep];
-    return depNode && (depNode.status === 'running' || depNode.status === 'failed');
-  });
-
-  return (
-    <div className={`task-node${node.is_bottleneck ? ' bottleneck' : ''}${isBlocked ? ' blocked' : ''}`}
-      style={{
-        '--node-accent': agentColor,
-        '--node-status-bg': sc.bg,
-        '--node-status-text': sc.text,
-        '--node-status-border': sc.border,
-      }}
-      onClick={onToggle}>
-      {/* Node header */}
-      <div className="node-header">
-        <div className="node-status-bar" style={{ background: sc.text }} />
-        <div className="node-meta">
-          <span className="node-id">{node.node_id}</span>
-          {node.agent_name && (
-            <span className="node-agent" style={{ color: agentColor }}>{node.agent_name}</span>
-          )}
-        </div>
-        <div className="node-status-tag" style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {sc.pulse && <span className="status-pulse" style={{ background: sc.text }} />}
-          {sc.label}
-        </div>
-      </div>
-
-      {/* Node body (always visible) */}
-      <div className="node-body">
-        <span className="node-label">{node.label}</span>
-        <span className="node-duration">{formatDuration(node.duration_ms)}</span>
-      </div>
-
-      {/* Expandable details */}
-      {isExpanded && (
-        <div className="node-details">
-          {node.description && (
-            <div className="detail-row">
-              <span className="detail-label">描述</span>
-              <span className="detail-value">{node.description}</span>
-            </div>
-          )}
-          {node.depends_on?.length > 0 && (
-            <div className="detail-row">
-              <span className="detail-label">依赖</span>
-              <span className="detail-value">
-                {node.depends_on.map(d => (
-                  <span key={d} className="dep-chip">{d}</span>
-                ))}
-              </span>
-            </div>
-          )}
-          {node.action && (
-            <div className="detail-row">
-              <span className="detail-label">动作</span>
-              <span className="detail-value"><code>{node.action}</code></span>
-            </div>
-          )}
-          {node.started_at && (
-            <div className="detail-row">
-              <span className="detail-label">开始</span>
-              <span className="detail-value">{new Date(node.started_at).toLocaleTimeString()}</span>
-            </div>
-          )}
-          {node.is_bottleneck && node.bottleneck_reason && (
-            <div className="detail-row bottleneck-row">
-              <span className="detail-label">⚠️ 卡点</span>
-              <span className="detail-value">{node.bottleneck_reason}</span>
-            </div>
-          )}
-          {isBlocked && (
-            <div className="detail-row blocked-row">
-              <span className="detail-label">🔄 阻塞</span>
-              <span className="detail-value">等待上游节点完成</span>
-            </div>
-          )}
-          {node.progress_events_count > 0 && (
-            <div className="detail-row">
-              <span className="detail-label">进度事件</span>
-              <span className="detail-value">{node.progress_events_count} 条</span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function TaskGraph({ parentTaskId, onClose }) {
   const [graph, setGraph] = useState(null);
+  const [planText, setPlanText] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [expandedNodes, setExpandedNodes] = useState(new Set());
-  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const fetchGraph = async () => {
     try {
-      const data = await api.get(`/parent-tasks/${parentTaskId}/graph/`);
-      setGraph(data);
+      const [gd, ptRes] = await Promise.all([
+        api.get(`/parent-tasks/${parentTaskId}/graph/`),
+        api.get(`/parent-tasks/${parentTaskId}/`).catch(() => null),
+      ]);
+      setGraph(gd);
+      if (ptRes?.dispatch_plan) {
+        try { setPlanText(typeof ptRes.dispatch_plan === 'string' ? ptRes.dispatch_plan : JSON.stringify(ptRes.dispatch_plan)); }
+        catch { setPlanText(ptRes.dispatch_plan?.user_message || ptRes.dispatch_plan?.plan || ''); }
+      }
       setError(null);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
+  useEffect(() => { fetchGraph(); }, [parentTaskId]);
+
   useEffect(() => {
-    fetchGraph();
-  }, [parentTaskId]);
+    if (!graph?.nodes) return;
+    const active = graph.nodes.some(n => n.status === 'running' || n.status === 'pending');
+    if (!active) return;
+    const iv = setInterval(fetchGraph, 3000);
+    return () => clearInterval(iv);
+  }, [graph?.nodes]);
 
-  // Auto-refresh for running tasks
-  useEffect(() => {
-    if (!autoRefresh || !graph) return;
-    const isRunning = graph.nodes?.some(n => n.status === 'running' || n.status === 'pending');
-    if (!isRunning) return;
-    const interval = setInterval(fetchGraph, 3000);
-    return () => clearInterval(interval);
-  }, [autoRefresh, graph?.nodes]);
-
-  const toggleNode = (nodeId) => {
-    setExpandedNodes(prev => {
-      const next = new Set(prev);
-      next.has(nodeId) ? next.delete(nodeId) : next.add(nodeId);
-      return next;
-    });
-  };
-
-  // Compute layer positions for DAG layout
-  const { layers, nodePositions, svgEdges, nodesById } = useMemo(() => {
-    if (!graph?.nodes) return { layers: [], nodePositions: {}, svgEdges: [], nodesById: {} };
-
-    const nodesById = {};
-    graph.nodes.forEach(n => { nodesById[n.node_id] = n; });
-
-    // Assign layers by topological depth
+  const layout = useMemo(() => {
+    if (!graph?.nodes?.length) return null;
+    const nodes = graph.nodes;
+    const nodeMap = {}; nodes.forEach(n => { nodeMap[n.node_id] = n; });
     const depths = {};
-    const visited = new Set();
-
-    function getDepth(nodeId) {
-      if (depths[nodeId] !== undefined) return depths[nodeId];
-      const node = nodesById[nodeId];
-      if (!node) return 0;
-      if (visited.has(nodeId)) return 0; // cycle guard
-      visited.add(nodeId);
-      const deps = node.depends_on || [];
-      if (deps.length === 0) { depths[nodeId] = 0; return 0; }
-      const maxDep = Math.max(...deps.map(d => getDepth(d)));
-      depths[nodeId] = maxDep + 1;
-      return depths[nodeId];
+    function getDepth(nid, visited = new Set()) {
+      if (visited.has(nid)) return 0;
+      visited.add(nid);
+      if (depths[nid] !== undefined) return depths[nid];
+      const nd = nodeMap[nid];
+      if (!nd?.depends_on?.length) { depths[nid] = 0; return 0; }
+      depths[nid] = Math.max(...nd.depends_on.map(d => getDepth(d, visited))) + 1;
+      return depths[nid];
     }
-
-    graph.nodes.forEach(n => getDepth(n.node_id));
-
-    // Group by layer
-    const layerMap = {};
-    graph.nodes.forEach(n => {
-      const d = depths[n.node_id] || 0;
-      if (!layerMap[d]) layerMap[d] = [];
-      layerMap[d].push(n);
-    });
-
-    const maxLayer = Math.max(...Object.keys(layerMap).map(Number));
+    nodes.forEach(n => getDepth(n.node_id));
     const layers = [];
-    for (let i = 0; i <= maxLayer; i++) {
-      if (layerMap[i]) layers.push(layerMap[i].sort((a, b) => a.seq - b.seq));
-    }
+    nodes.forEach(n => { const d = depths[n.node_id] || 0; if (!layers[d]) layers[d] = []; layers[d].push(n); });
 
-    // Position nodes
-    const nodeW = 220, nodeH = 80, gapX = 40, gapY = 30;
+    const NODE_W = 210, NODE_H = 66, GAP_X = 20, GAP_Y = 80, SVG_W = 920;
     const positions = {};
     layers.forEach((layer, li) => {
-      const totalW = layer.length * nodeW + (layer.length - 1) * gapX;
-      const startX = -(totalW / 2) + nodeW / 2;
-      layer.forEach((node, ni) => {
-        positions[node.node_id] = {
-          x: startX + ni * (nodeW + gapX),
-          y: li * (nodeH + gapY),
-          layer: li,
-          index: ni,
-        };
-      });
+      const tw = layer.length * NODE_W + (layer.length - 1) * GAP_X;
+      const sx = Math.max(30, (SVG_W - tw) / 2);
+      layer.forEach((nd, ni) => { positions[nd.node_id] = { x: sx + ni * (NODE_W + GAP_X), y: 30 + li * (NODE_H + GAP_Y) }; });
     });
-
-    // SVG edges
     const edges = [];
-    const edgeSet = new Set();
-    (graph.edges || []).forEach(e => {
-      const from = positions[e.from];
-      const to = positions[e.to];
-      if (from && to) {
-        const key = `${e.from}->${e.to}`;
-        if (!edgeSet.has(key)) {
-          edgeSet.add(key);
-          const midY = (from.y + to.y) / 2;
-          edges.push({
-            key,
-            fromX: from.x,
-            fromY: from.y + nodeH / 2,
-            toX: to.x,
-            toY: to.y - nodeH / 2,
-            midY,
-          });
-        }
-      }
-    });
-
-    return { layers, nodePositions: positions, svgEdges: edges, nodesById };
+    nodes.forEach(nd => { (nd.depends_on || []).forEach(dep => {
+      const f = positions[dep], t = positions[nd.node_id];
+      if (f && t) edges.push({ from: f, to: t, status: nd.status });
+    });});
+    const SVG_H = 30 + layers.length * (NODE_H + GAP_Y) + 50;
+    return { layers, positions, edges, nodeMap, NODE_W, NODE_H, SVG_W, SVG_H };
   }, [graph]);
 
-  if (loading) {
-    return (
-      <div className="task-graph-loading">
-        <div className="graph-spinner" />
-        <span>加载任务图...</span>
-      </div>
-    );
-  }
+  if (loading) return <div className="task-graph-loading"><div className="graph-spinner" /><span>加载任务图...</span></div>;
+  if (error) return <div className="task-graph-error">❌ {error} <button className="btn btn-ghost" onClick={fetchGraph}>重试</button></div>;
+  if (!layout) return <div className="task-graph-loading">无数据</div>;
 
-  if (error) {
-    return (
-      <div className="task-graph-error">
-        <span>⚠️ 加载失败: {error}</span>
-        <button className="btn btn-ghost" onClick={fetchGraph}>重试</button>
-      </div>
-    );
-  }
-
-  if (!graph) return null;
-
-  const progress = graph.total_nodes > 0
-    ? ((graph.completed_nodes + graph.failed_nodes) / graph.total_nodes * 100).toFixed(0)
-    : 0;
-
-  const svgWidth = 900;
-  const svgHeight = Math.max(400, layers.length * 120 + 40);
+  const { layers, positions, edges, NODE_W, NODE_H, SVG_W, SVG_H } = layout;
+  const total = graph.nodes.length;
+  const done = graph.nodes.filter(n => n.status === 'done').length;
+  const running = graph.nodes.filter(n => n.status === 'running').length;
 
   return (
-    <div className="task-graph-panel">
+    <div className="card" style={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 12, overflow: 'hidden' }}>
       {/* Header */}
-      <div className="graph-header">
-        <div className="graph-header-left">
-          <h2 className="graph-title">任务 #{parentTaskId} 执行图</h2>
-          <span className={`graph-parent-status status-${graph.parent_status?.toLowerCase()}`}>
-            {graph.parent_status}
+      <div className="card-header" style={{ borderBottom: '1px solid #1e293b', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22d3ee', animation: 'pulse 2s infinite' }} />
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#e8ecf1', fontFamily: 'var(--font-mono)' }}>
+            #{parentTaskId} · {total} 节点 · {graph.parent_status}
           </span>
         </div>
-        <div className="graph-header-right">
-          <div className="graph-stats">
-            <span className="stat-item done">{graph.completed_nodes} 完成</span>
-            {graph.running_nodes > 0 && <span className="stat-item running">{graph.running_nodes} 执行中</span>}
-            {graph.failed_nodes > 0 && <span className="stat-item failed">{graph.failed_nodes} 失败</span>}
-            <span className="stat-item pending">{graph.pending_nodes} 等待</span>
-          </div>
-          <div className="graph-progress-bar">
-            <div className="graph-progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="graph-actions">
-            <label className="auto-refresh-label">
-              <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
-              自动刷新
-            </label>
-            <button className="btn btn-ghost" style={{fontSize:11}} onClick={fetchGraph}>🔄 刷新</button>
-            <button className="btn btn-ghost" style={{fontSize:11}} onClick={onClose}>✕ 关闭</button>
-          </div>
+        <div style={{ display: 'flex', gap: 10, fontSize: 11 }}>
+          <span style={{ color: '#34d399' }}>✓ {done}</span>
+          <span style={{ color: '#22d3ee' }}>▶ {running}</span>
+          <span style={{ color: '#64748b' }}>○ {total - done - running}</span>
+          <button className="btn btn-ghost" style={{ fontSize: 10, color: '#94a3b8' }} onClick={fetchGraph}>🔄</button>
+          {onClose && <button className="btn btn-ghost" style={{ fontSize: 10, color: '#94a3b8' }} onClick={onClose}>✕</button>}
         </div>
       </div>
 
-      {/* Bottleneck alerts */}
-      {graph.bottlenecks?.length > 0 && (
-        <div className="bottleneck-alerts">
-          {graph.bottlenecks.map(b => (
-            <div key={b.node_id} className="bottleneck-alert">
-              <span className="alert-icon">⚠️</span>
-              <span className="alert-node">{b.node_id}: {b.label}</span>
-              <span className="alert-time">{formatDuration(b.duration_ms)}</span>
-            </div>
-          ))}
+      {/* PLAN panel */}
+      {planText && (
+        <div style={{ margin: '10px 16px', padding: '10px 14px', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: 8, fontSize: 11, fontFamily: 'var(--font-mono)', color: '#fbbf24', maxHeight: 80, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+          📋 <strong>云枢 PLAN:</strong> {planText.slice(0, 500)}
         </div>
       )}
 
-      {/* Graph area */}
-      <div className="graph-canvas-wrap">
-        <svg className="graph-svg-edges"
-          width={svgWidth} height={svgHeight}
-          viewBox={`${-svgWidth/2} 0 ${svgWidth} ${svgHeight}`}>
-          {svgEdges.map(e => (
-            <g key={e.key}>
-              <line
-                x1={e.fromX} y1={e.fromY}
-                x2={e.toX} y2={e.toY}
-                stroke="rgba(120,140,180,0.4)" strokeWidth="1.5" />
-              {/* Arrow head */}
-              <polygon
-                points={`${e.toX-4},${e.toY-8} ${e.toX+4},${e.toY-8} ${e.toX},${e.toY}`}
-                fill="rgba(120,140,180,0.5)" />
+      {/* SVG Diagram */}
+      <div style={{ overflowX: 'auto', background: '#020617' }}>
+        <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ display: 'block', minWidth: 900 }}>
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.5" />
+            </pattern>
+            <marker id="aGray" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#475569" />
+            </marker>
+            <marker id="aColor" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="#22d3ee" />
+            </marker>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+
+          {edges.map((e, i) => (
+            <g key={i}>
+              <line x1={e.from.x + NODE_W} y1={e.from.y + NODE_H / 2}
+                x2={e.to.x} y2={e.to.y + NODE_H / 2}
+                stroke={e.status === 'running' ? '#22d3ee' : '#475569'} strokeWidth={e.status === 'running' ? 1.5 : 0.8}
+                strokeDasharray={e.status !== 'running' ? '4,3' : undefined}
+                markerEnd={e.status === 'running' ? 'url(#aColor)' : 'url(#aGray)'} />
             </g>
           ))}
-        </svg>
 
-        <div className="graph-layers">
-          {layers.map((layer, li) => (
-            <div key={li} className="graph-layer">
-              {layer.map(node => {
-                const pos = nodePositions[node.node_id] || {};
-                return (
-                  <NodeCard
-                    key={node.node_id}
-                    node={node}
-                    isExpanded={expandedNodes.has(node.node_id)}
-                    onToggle={() => toggleNode(node.node_id)}
-                    nodesById={nodesById}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
+          {graph.nodes.map(nd => {
+            const p = positions[nd.node_id];
+            if (!p) return null;
+            const agent = AGENT_INFO[nd.agent_name?.toLowerCase()] || AGENT_INFO.banni;
+            const sc = STATUS_COLORS[nd.status] || STATUS_COLORS.pending;
+            const isRunning = nd.status === 'running';
+            return (
+              <g key={nd.node_id}>
+                <rect x={p.x} y={p.y} width={NODE_W} height={NODE_H} rx={8} fill="#0f172a" stroke={sc.stroke} strokeWidth={isRunning ? 1.8 : 0.8} />
+                <rect x={p.x} y={p.y} width={NODE_W} height={NODE_H} rx={8} fill={sc.fill} stroke="none" />
+                {/* Agent color left bar */}
+                <rect x={p.x} y={p.y + 4} width={3} height={NODE_H - 8} rx={1.5} fill={agent.stroke} />
+                {/* Agent name (primary) */}
+                <text x={p.x + 14} y={p.y + 22} fill="#e8ecf1" fontSize={13} fontWeight={600} fontFamily="'Inter', sans-serif">{agent.emoji} {agent.name}</text>
+                {/* Task description (secondary) */}
+                <text x={p.x + 14} y={p.y + 40} fill="#94a3b8" fontSize={10} fontFamily="sans-serif">
+                  {nd.node_id}: {(nd.label || '').length > 16 ? (nd.label || '').slice(0, 16) + '…' : nd.label || ''}
+                </text>
+                {/* Status badge */}
+                <rect x={p.x + NODE_W - 78} y={p.y + 8} width={66} height={16} rx={8} fill={sc.fill} stroke={sc.stroke} strokeWidth={0.5} />
+                <text x={p.x + NODE_W - 45} y={p.y + 19} fill={sc.text} fontSize={9} fontWeight={500} textAnchor="middle" fontFamily="sans-serif">{sc.label}</text>
+                {/* Duration */}
+                {nd.duration_ms > 0 && (
+                  <text x={p.x + NODE_W - 78} y={p.y + NODE_H - 6} fill="#475569" fontSize={9} fontFamily="var(--font-mono)" textAnchor="end">
+                    {(nd.duration_ms / 1000).toFixed(1)}s
+                  </text>
+                )}
+                {/* Running pulse */}
+                {isRunning && <rect x={p.x} y={p.y} width={NODE_W} height={NODE_H} rx={8} fill="none" stroke="#22d3ee" strokeWidth={1.8} opacity={0.5}>
+                  <animate attributeName="opacity" values="0.5;0.1;0.5" dur="1.5s" repeatCount="indefinite" />
+                </rect>}
+              </g>
+            );
+          })}
+        </svg>
       </div>
     </div>
   );

@@ -122,9 +122,11 @@ class Skill(models.Model):
         DRAFT = 'draft', '草稿'
 
     name = models.CharField(max_length=128, db_index=True)
+    name_zh = models.CharField(max_length=128, blank=True, default='', help_text='中文名称')
     slug = models.SlugField(max_length=128, unique=True)
     version = models.CharField(max_length=32, default='1.0.0')
     description = models.TextField(blank=True, default='')
+    description_zh = models.TextField(blank=True, default='', help_text='中文说明')
 
     # 技能原始文件内容（Markdown 全文）
     content = models.TextField(blank=True, default='', help_text='SKILL.md 原始 Markdown 内容')
@@ -665,6 +667,21 @@ class ChildTask(models.Model):
 
 class ProgressEvent(models.Model):
     """子任务进度快照"""
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        try:
+            import redis, json
+            r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+            parent_id = self.child_task.parent_id
+            r.publish(f'task:progress:{parent_id}', json.dumps({
+                'event_type': 'progress_event', 'child_task_id': self.child_task_id,
+                'event_type_str': self.event_type, 'payload': self.payload,
+                'seq': self.seq, 'created_at': str(self.created_at),
+            }, default=str))
+        except Exception:
+            pass
+
     class EventType(models.TextChoices):
         HEARTBEAT = 'heartbeat', '心跳'
         STAGE_MARK = 'stage_mark', '阶段标记'
@@ -721,6 +738,31 @@ class Checkpoint(models.Model):
 
 class TaskNode(models.Model):
     """任务图节点：存储每个 ParentTask 的 PLAN 分解节点及其执行状态、耗时、卡点标记"""
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_status = None
+        if not is_new:
+            try:
+                old = TaskNode.objects.get(pk=self.pk)
+                old_status = old.status
+            except TaskNode.DoesNotExist:
+                pass
+        super().save(*args, **kwargs)
+        if is_new or old_status != self.status:
+            try:
+                import redis, json
+                r = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
+                r.publish(f'task:progress:{self.parent_task_id}', json.dumps({
+                    'event_type': 'node_status', 'node_id': self.node_id, 'label': self.label,
+                    'status': self.status, 'agent_name': self.agent_name,
+                    'duration_ms': self.duration_ms, 'is_bottleneck': self.is_bottleneck,
+                    'started_at': str(self.started_at) if self.started_at else None,
+                    'finished_at': str(self.finished_at) if self.finished_at else None,
+                    'timestamp': str(timezone.now()),
+                }, default=str))
+            except Exception:
+                pass
 
     class NodeStatus(models.TextChoices):
         PENDING = 'pending', '等待'

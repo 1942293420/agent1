@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import TaskGraph from './TaskGraph';
+import RealtimeDashboard from './RealtimeDashboard';
 
 export default function Tasks({ tasks, setTasks, addToast, openDetail, openModal, setView }) {
   const [filter, setFilter] = useState('all');
@@ -91,6 +92,23 @@ export default function Tasks({ tasks, setTasks, addToast, openDetail, openModal
     );
   }
 
+  // If viewing SSE realtime dashboard
+  if (viewMode === 'realtime' && graphTaskId) {
+    return (
+      <>
+        <div className="view-header">
+          <h1 className="view-title">实时任务看板</h1>
+          <div className="view-actions">
+            <button className="btn btn-ghost" style={{fontSize:11}} onClick={() => { setViewMode('tree'); setGraphTaskId(null); }}>
+              ← 返回列表
+            </button>
+          </div>
+        </div>
+        <RealtimeDashboard parentTaskId={graphTaskId} />
+      </>
+    );
+  }
+
   return (
     <>
       <div className="view-header">
@@ -144,7 +162,7 @@ export default function Tasks({ tasks, setTasks, addToast, openDetail, openModal
                 <thead>
                   <tr>
                     {batchMode && <th style={{width:40}}><input type="checkbox" checked={selected.size === paged.length && paged.length > 0} onChange={selectAll} /></th>}
-                    <th>任务</th><th>Agent</th><th>状态</th><th>优先级</th><th>时间</th>
+                    <th>任务</th><th>Agent</th><th>状态</th><th>优先级</th><th>时间</th><th style={{width:80}}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -158,6 +176,12 @@ export default function Tasks({ tasks, setTasks, addToast, openDetail, openModal
                         <td><span style={{fontSize:10,padding:'2px 8px',borderRadius:10,background:sc.bg,color:sc.text,border:`1px solid ${sc.border}`,fontWeight:500}}>{statusCN[t.status]||t.status}</span></td>
                         <td><span className={`priority-badge ${t.priority||'medium'}`}>{t.priority==='high'?'高':t.priority==='low'?'低':'中'}</span></td>
                         <td style={{fontSize:11,color:'var(--text-muted)'}}>{t.created_at?new Date(t.created_at).toLocaleString():'—'}</td>
+                        <td onClick={e => e.stopPropagation()} style={{display:'flex',gap:4}}>
+                          {t._type === 'parent' && <>
+                            <button className="btn btn-ghost" style={{fontSize:10,padding:'2px 6px'}} title="静态节点图" onClick={() => { setGraphTaskId(t.id); setViewMode('graph-full'); }}>📊</button>
+                            <button className="btn btn-ghost" style={{fontSize:10,padding:'2px 6px',color:'#10b981'}} title="SSE实时看板" onClick={() => { setGraphTaskId(t.id); setViewMode('realtime'); }}>📡</button>
+                          </>}
+                        </td>
                       </tr>
                     );
                   })}

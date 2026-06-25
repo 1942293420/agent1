@@ -111,6 +111,15 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
 
   const activeSession = sessions.find(s => s.id === active);
 
+  // Agent role labels
+  const agentRoles = {
+    '豆角云枢': '决策中心 · 多Agent协同调度',
+    '云枢': '决策中心 · 多Agent协同调度',
+    'Banni': '小温 · 飞书助手',
+    'Basir': '范先生 · 主力Agent',
+  };
+  const agentRole = activeSession ? (agentRoles[activeSession.agent_name] || '') : '';
+
   // Poll messages
   useEffect(() => {
     if (!active) { setMessages([]); return; }
@@ -417,6 +426,7 @@ export default function Sessions({ sessions, setSessions, agents, addToast, open
               <div className="session-detail-header">
                 <div>
                   <span className="session-detail-agent">{activeSession.agent_name || '未指定'}</span>
+                  {agentRole && <span className="session-detail-role">{agentRole}</span>}
                   <span className="session-detail-meta">
                     · {activeSession.message_count || 0} 条消息
                     {activeSession.feishu_chat_id ? ' · 💬飞书' : ''}

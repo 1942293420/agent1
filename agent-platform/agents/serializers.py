@@ -138,7 +138,7 @@ class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill
         fields = [
-            'id', 'name', 'slug', 'version', 'description', 'content',
+            'id', 'name', 'name_zh', 'slug', 'version', 'description', 'description_zh', 'content',
             'file_url', 'file_hash', 'file_size',
             'source', 'status', 'category', 'tags',
             'meyo_skill_id', 'last_synced_at',

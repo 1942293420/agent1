@@ -157,7 +157,7 @@ def process_message(msg_id):
         conv_agent = ""
 
     # Agent 路由：只有云枢走调度模式，其他 Agent 直接对话
-    DIRECT_AGENTS = {"云衡": "tester", "Banni": "banni", "Basir": "basir"}
+    DIRECT_AGENTS = {"云衡": "yunheng", "Banni": "banni", "Basir": "basir"}
     if conv_agent in DIRECT_AGENTS:
         profile = DIRECT_AGENTS[conv_agent]
         print(f"[Worker] #{msg_id} → {conv_agent}(直接对话)")

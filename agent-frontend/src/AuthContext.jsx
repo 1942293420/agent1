@@ -29,15 +29,16 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    // 先手动清除 cookie（前端层面）
+    const host = window.location.hostname;
+    // 双保险：无 domain + 带 domain 各删一次
     document.cookie = 'sessionid=; Max-Age=0; path=/';
+    document.cookie = `sessionid=; Max-Age=0; path=/; domain=${host}`;
     document.cookie = 'csrftoken=; Max-Age=0; path=/';
-    // 再调用 API 清除服务端 session
+    document.cookie = `csrftoken=; Max-Age=0; path=/; domain=${host}`;
     await fetch('/api/auth/logout/', {
       method: 'POST',
       credentials: 'include',
     }).catch(() => {});
-    // 强制跳转首页
     window.location.href = '/';
   }, []);
 

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentOS v5.0 — 系统架构图</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'JetBrains Mono',monospace;background:#020617;min-height:100vh;padding:2rem;color:#fff}
+    .container{max-width:1300px;margin:0 auto}
+    .header{margin-bottom:2rem}
+    .header-row{display:flex;align-items:center;gap:1rem;margin-bottom:.5rem}
+    .pulse-dot{width:12px;height:12px;background:#22d3ee;border-radius:50%;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+    h1{font-size:1.5rem;font-weight:700;letter-spacing:-.025em}
+    .subtitle{color:#94a3b8;font-size:.875rem;margin-left:1.75rem}
+    .diagram-container{background:rgba(15,23,42,.5);border-radius:1rem;border:1px solid #1e293b;padding:1.5rem;overflow-x:auto}
+    svg{width:100%;min-width:1000px;display:block}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:2rem}
+    .card{background:rgba(15,23,42,.5);border-radius:.75rem;border:1px solid #1e293b;padding:1.25rem}
+    .card-header{display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem}
+    .card-dot{width:8px;height:8px;border-radius:50%}
+    .card-dot.cyan{background:#22d3ee}.card-dot.emerald{background:#34d399}.card-dot.violet{background:#a78bfa}
+    .card-dot.amber{background:#fbbf24}.card-dot.orange{background:#fb923c}.card-dot.rose{background:#fb7185}
+    .card h3{font-size:.875rem;font-weight:600}
+    .card ul{list-style:none;color:#94a3b8;font-size:.75rem}
+    .card li{margin-bottom:.375rem}
+    .footer{text-align:center;margin-top:1.5rem;color:#475569;font-size:.75rem}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="header-row">
+      <div class="pulse-dot"></div>
+      <h1>AgentOS v5.0 — 多Agent协同平台架构</h1>
+    </div>
+    <p class="subtitle">Worker 20线程并发 · 600s任务熔断 · 队列积压告警 · 子Agent深度限制3层 · SQLite WAL+外键</p>
+  </div>
+
+  <div class="diagram-container">
+    <svg viewBox="0 0 1200 820">
+      <defs>
+        <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+        </marker>
+        <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+        </marker>
+        <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+        </marker>
+        <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c"/>
+        </marker>
+        <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+        </marker>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)"/>
+
+      <!-- ===== REGION: AgentOS Platform ===== -->
+      <rect x="180" y="20" width="1000" height="780" rx="12" fill="rgba(251,191,36,0.03)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+      <text x="192" y="42" fill="#fbbf24" font-size="11" font-weight="600">AgentOS Platform (Django + Redis + Hermes)</text>
+
+      <!-- ===== USERS ===== -->
+      <rect x="24" y="120" width="130" height="60" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="89" y="145" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">👤 飞书用户</text>
+      <text x="89" y="162" fill="#94a3b8" font-size="9" text-anchor="middle">Feishu DM</text>
+
+      <rect x="24" y="220" width="130" height="60" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="89" y="245" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">🌐 Web 用户</text>
+      <text x="89" y="262" fill="#94a3b8" font-size="9" text-anchor="middle">Browser :5174</text>
+
+      <!-- Arrows: Users → Feishu Gateway / Frontend -->
+      <line x1="154" y1="150" x2="198" y2="150" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+      <text x="176" y="144" fill="#22d3ee" font-size="8" text-anchor="middle">WS</text>
+      <line x1="154" y1="250" x2="198" y2="250" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+      <text x="176" y="244" fill="#22d3ee" font-size="8" text-anchor="middle">HTTPS</text>
+
+      <!-- ===== FEISHU GATEWAY ===== -->
+      <rect x="200" y="110" width="160" height="50" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="280" y="127" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">Feishu Gateway</text>
+      <text x="280" y="145" fill="#94a3b8" font-size="9" text-anchor="middle">WebSocket · 消息路由</text>
+
+      <!-- Gateway → Backend -->
+      <line x1="360" y1="135" x2="458" y2="135" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+      <!-- ===== FRONTEND ===== -->
+      <rect x="200" y="200" width="160" height="80" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+      <text x="280" y="222" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">AgentOS Frontend</text>
+      <text x="280" y="240" fill="#94a3b8" font-size="9" text-anchor="middle">React + Vite :5174</text>
+      <text x="280" y="254" fill="#94a3b8" font-size="8" text-anchor="middle">会话中心 · 输出面板</text>
+      <text x="280" y="268" fill="#22d3ee" font-size="7" text-anchor="middle">可拖拽分栏 · 实时消息</text>
+
+      <!-- Frontend → Backend -->
+      <path d="M 360 240 L 420 240 Q 440 240 440 260 L 440 310" fill="none" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+      <text x="412" y="280" fill="#22d3ee" font-size="8">REST API</text>
+
+      <!-- ===== BACKEND ===== -->
+      <rect x="460" y="80" width="200" height="320" rx="8" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+      <text x="560" y="105" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">Django REST API</text>
+      <text x="560" y="122" fill="#94a3b8" font-size="9" text-anchor="middle">Gunicorn :8001 · 2 workers</text>
+
+      <!-- Sub-components -->
+      <rect x="475" y="136" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="154" fill="#94a3b8" font-size="9" text-anchor="middle">MessageViewSet</text>
+
+      <rect x="475" y="172" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="190" fill="#94a3b8" font-size="9" text-anchor="middle">ConversationViewSet</text>
+
+      <rect x="475" y="208" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="226" fill="#94a3b8" font-size="9" text-anchor="middle">Output Panel API</text>
+
+      <rect x="475" y="244" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="262" fill="#94a3b8" font-size="9" text-anchor="middle">TaskViewSet</text>
+
+      <rect x="475" y="280" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="298" fill="#94a3b8" font-size="9" text-anchor="middle">AgentViewSet</text>
+
+      <rect x="475" y="316" width="170" height="28" rx="4" fill="rgba(6,78,59,0.2)" stroke="#34d399" stroke-width="0.8"/>
+      <text x="560" y="334" fill="#94a3b8" font-size="9" text-anchor="middle">SSE Event Stream</text>
+
+      <rect x="475" y="352" width="170" height="32" rx="4" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1"/>
+      <text x="560" y="367" fill="#fff" font-size="9" text-anchor="middle">LLM Reply (DeepSeek)</text>
+      <text x="560" y="379" fill="#94a3b8" font-size="7" text-anchor="middle">_call_llm_for_reply</text>
+
+      <!-- Routes -->
+      <text x="472" y="418" fill="#34d399" font-size="8">GET/POST /api/conversations/</text>
+      <text x="472" y="432" fill="#34d399" font-size="8">POST /api/messages/</text>
+      <text x="472" y="446" fill="#34d399" font-size="8">GET /api/conversations/{id}/get-output/</text>
+
+      <!-- Backend → Redis -->
+      <line x1="660" y1="150" x2="718" y2="150" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+      <text x="689" y="144" fill="#fb923c" font-size="8" text-anchor="middle">lpush</text>
+
+      <!-- ===== REDIS ===== -->
+      <rect x="720" y="80" width="180" height="120" rx="6" fill="rgba(251,146,60,0.15)" stroke="#fb923c" stroke-width="1.5"/>
+      <text x="810" y="105" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">Redis :6379</text>
+
+      <rect x="735" y="118" width="150" height="22" rx="3" fill="rgba(251,146,60,0.2)" stroke="#fb923c" stroke-width="0.8"/>
+      <text x="810" y="133" fill="#94a3b8" font-size="9" text-anchor="middle">msg_queue (BLPOP)</text>
+
+      <rect x="735" y="148" width="150" height="22" rx="3" fill="rgba(251,146,60,0.2)" stroke="#fb923c" stroke-width="0.8"/>
+      <text x="810" y="163" fill="#94a3b8" font-size="9" text-anchor="middle">orch:state:*</text>
+
+      <rect x="735" y="178" width="150" height="18" rx="3" fill="rgba(251,146,60,0.1)" stroke="#fb923c" stroke-width="0.5"/>
+      <text x="810" y="190" fill="#fbbf24" font-size="7" text-anchor="middle">积压告警: >100 WARN >500 CRIT</text>
+
+      <!-- Redis → Worker -->
+      <line x1="900" y1="140" x2="938" y2="140" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+
+      <!-- ===== WORKER ===== -->
+      <rect x="940" y="60" width="240" height="360" rx="8" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="1060" y="85" fill="#fff" font-size="13" font-weight="600" text-anchor="middle">redis_worker.py</text>
+      <text x="1060" y="102" fill="#94a3b8" font-size="9" text-anchor="middle">ThreadPoolExecutor: 20 workers</text>
+      <text x="1060" y="118" fill="#fbbf24" font-size="8" text-anchor="middle">600s 任务熔断 · 3层深度限制</text>
+
+      <!-- Worker sub -->
+      <rect x="955" y="132" width="210" height="28" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="1060" y="150" fill="#94a3b8" font-size="9" text-anchor="middle">process_message(msg)</text>
+
+      <rect x="955" y="168" width="210" height="28" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="1060" y="186" fill="#94a3b8" font-size="9" text-anchor="middle">_push_msg(✅ 已收到)</text>
+
+      <rect x="955" y="204" width="210" height="28" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="1060" y="222" fill="#94a3b8" font-size="9" text-anchor="middle">yunshu_io.run_session()</text>
+
+      <text x="1060" y="252" fill="#fbbf24" font-size="8" text-anchor="middle">↓ 云枢决策调度 ↓</text>
+
+      <!-- Hermes sub -->
+      <rect x="955" y="264" width="210" height="60" rx="4" fill="rgba(120,53,15,0.25)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="1060" y="283" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">hermes chat -q -p {profile}</text>
+      <text x="1060" y="300" fill="#94a3b8" font-size="8" text-anchor="middle">subprocess · 600s timeout</text>
+      <text x="1060" y="315" fill="#fbbf24" font-size="7" text-anchor="middle">profile: Banni | Basir | ...</text>
+
+      <rect x="955" y="336" width="210" height="28" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="1060" y="354" fill="#94a3b8" font-size="9" text-anchor="middle">_save_reply → Message</text>
+
+      <rect x="955" y="372" width="210" height="28" rx="4" fill="rgba(120,53,15,0.2)" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="1060" y="390" fill="#94a3b8" font-size="9" text-anchor="middle">_mark_processed</text>
+
+      <!-- Worker → Backend (reply) -->
+      <path d="M 940 150 L 900 150 L 900 450 L 660 450 L 660 388" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
+      <text x="800" y="464" fill="#fbbf24" font-size="7" text-anchor="middle">POST /api/messages/ (agent reply)</text>
+
+      <!-- Worker → Backend (feishu) -->
+      <path d="M 940 390 L 700 390 L 700 460 L 460 460 L 460 300" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="5,3"/>
+
+      <!-- ===== HERMES AGENTS ===== -->
+      <rect x="720" y="460" width="280" height="120" rx="8" fill="rgba(136,19,55,0.2)" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="4,4"/>
+      <text x="728" y="478" fill="#fb7185" font-size="9">Hermes Agent Profiles</text>
+
+      <rect x="735" y="490" width="120" height="35" rx="4" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="0.8"/>
+      <text x="795" y="506" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">Banni (小温)</text>
+      <text x="795" y="520" fill="#94a3b8" font-size="7" text-anchor="middle">DeepSeek · portrait</text>
+
+      <rect x="865" y="490" width="120" height="35" rx="4" fill="rgba(136,19,55,0.25)" stroke="#fb7185" stroke-width="0.8"/>
+      <text x="925" y="506" fill="#fff" font-size="10" font-weight="600" text-anchor="middle">Basir</text>
+      <text x="925" y="520" fill="#94a3b8" font-size="7" text-anchor="middle">DeepSeek · portrait</text>
+
+      <text x="860" y="556" fill="#94a3b8" font-size="8" text-anchor="middle">每个 Profile 独立: Memory · Skills · 系统提示</text>
+      <text x="860" y="572" fill="#fb7185" font-size="7" text-anchor="middle">回复包含 【OUTPUT_PANEL】 → 自动推送到 Web 输出面板</text>
+
+      <!-- Agents → Worker connection -->
+      <line x1="860" y1="460" x2="860" y2="422" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
+
+      <!-- ===== SQLite ===== -->
+      <rect x="200" y="460" width="200" height="85" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+      <text x="300" y="482" fill="#fff" font-size="12" font-weight="600" text-anchor="middle">SQLite (WAL)</text>
+      <text x="300" y="500" fill="#94a3b8" font-size="9" text-anchor="middle">agents · conversations</text>
+      <text x="300" y="514" fill="#94a3b8" font-size="9" text-anchor="middle">messages · tasks · skills</text>
+      <text x="300" y="532" fill="#a78bfa" font-size="7" text-anchor="middle">foreign_keys=ON · 6 indexes</text>
+
+      <!-- Backend ↔ SQLite -->
+      <line x1="460" y1="480" x2="400" y2="480" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+      <text x="430" y="474" fill="#a78bfa" font-size="7" text-anchor="middle">Django ORM</text>
+
+      <!-- ===== MONITORING ===== -->
+      <rect x="720" y="600" width="460" height="70" rx="6" fill="rgba(251,191,36,0.08)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,3"/>
+      <text x="732" y="618" fill="#fbbf24" font-size="10" font-weight="600">📊 监控 + 运维</text>
+
+      <rect x="735" y="628" width="100" height="28" rx="4" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="0.5"/>
+      <text x="785" y="646" fill="#94a3b8" font-size="8" text-anchor="middle">systemctl</text>
+
+      <rect x="845" y="628" width="100" height="28" rx="4" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="0.5"/>
+      <text x="895" y="646" fill="#94a3b8" font-size="8" text-anchor="middle">journalctl</text>
+
+      <rect x="955" y="628" width="100" height="28" rx="4" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="0.5"/>
+      <text x="1005" y="646" fill="#94a3b8" font-size="8" text-anchor="middle">cronjob</text>
+
+      <rect x="1065" y="628" width="100" height="28" rx="4" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="0.5"/>
+      <text x="1115" y="646" fill="#94a3b8" font-size="8" text-anchor="middle">redis-cli</text>
+
+      <!-- Pipeline Status -->
+      <rect x="720" y="690" width="460" height="60" rx="6" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="0.8"/>
+      <text x="732" y="710" fill="#22d3ee" font-size="10" font-weight="600">🔍 全链路监控 API: /api/system/pipeline-status/</text>
+      <text x="732" y="730" fill="#94a3b8" font-size="8">Worker状态 · Redis队列深度 · Hermes活跃进程 · 消息统计(总数/待处理/已回复/近5分钟)</text>
+      <text x="732" y="744" fill="#475569" font-size="7">Worker活跃进程数 · 队列积压告警 · 飞书消息 relay · 全链路追踪</text>
+
+      <!-- ===== LEGEND ===== -->
+      <text x="24" y="40" fill="#fff" font-size="10" font-weight="600">图例</text>
+      <rect x="24" y="52" width="16" height="10" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+      <text x="46" y="60" fill="#94a3b8" font-size="8">Frontend</text>
+      <rect x="24" y="68" width="16" height="10" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+      <text x="46" y="76" fill="#94a3b8" font-size="8">Backend API</text>
+      <rect x="24" y="84" width="16" height="10" rx="2" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1"/>
+      <text x="46" y="92" fill="#94a3b8" font-size="8">Message Bus</text>
+      <rect x="24" y="100" width="16" height="10" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+      <text x="46" y="108" fill="#94a3b8" font-size="8">Worker/Cloud</text>
+      <rect x="24" y="116" width="16" height="10" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
+      <text x="46" y="124" fill="#94a3b8" font-size="8">Database</text>
+      <rect x="24" y="132" width="16" height="10" rx="2" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1"/>
+      <text x="46" y="140" fill="#94a3b8" font-size="8">AI Agents</text>
+      <rect x="24" y="148" width="16" height="10" rx="2" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1"/>
+      <text x="46" y="156" fill="#94a3b8" font-size="8">External</text>
+
+      <line x1="24" y1="170" x2="40" y2="170" stroke="#fbbf24" stroke-width="1" stroke-dasharray="5,3"/>
+      <text x="46" y="173" fill="#94a3b8" font-size="8">Reply Path</text>
+    </svg>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-header"><div class="card-dot orange"></div><h3>消息流转</h3></div>
+      <ul>
+        <li>• 飞书/Web → POST /api/messages/</li>
+        <li>• MessageViewSet → Redis lpush msg_queue</li>
+        <li>• redis_worker BLPOP → 20线程并发处理</li>
+        <li>• yunshu_io 云枢调度 → hermes chat -q</li>
+        <li>• Agent回复 → POST /api/messages/</li>
+        <li>• 飞书 relay_feishu.py · Web SSE推送</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot cyan"></div><h3>前端能力</h3></div>
+      <ul>
+        <li>• 会话中心 — 可拖拽分栏 · 实时消息</li>
+        <li>• 输出面板 — Agent推送文档预览+下载.md</li>
+        <li>• Agent管理 — 对话绑定指定Agent</li>
+        <li>• 系统监控 — Workers · Redis · Pipeline</li>
+        <li>• 全屏输出 · 切换动画 · 飞书蓝主题</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-dot rose"></div><h3>关键配置 v5.0</h3></div>
+      <ul>
+        <li>• Worker: 20线程 · 600s熔断 · 3层深度</li>
+        <li>• Hermes: 600s超时 · --yolo模式</li>
+        <li>• 队列: >100 WARN · >500 CRIT · 背压</li>
+        <li>• SQLite: WAL · foreign_keys=ON · 6索引</li>
+        <li>• API: set-output/get-output 文档推送</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="footer">AgentOS v5.0 Architecture · 2026-06-24 · Worker 20并发 · 输出面板 · 应答机制 · 全链路监控</p>
+</div>
+</body>
+</html>
