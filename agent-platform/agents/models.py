@@ -863,3 +863,20 @@ class TaskNode(models.Model):
         threshold = durations[cutoff_idx] if cutoff_idx < len(durations) else durations[-1]
 
         return self.duration_ms >= threshold
+
+
+# ═══════════════════════════════════════════════
+# UserPasswordRecord — 管理员可查看的密码明文
+# ═══════════════════════════════════════════════
+
+class UserPasswordRecord(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_records')
+    password = models.CharField(max_length=128, help_text='明文密码，仅供管理员查看')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'user_password_records'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.user.username} — {self.created_at.strftime("%Y-%m-%d %H:%M")}'

@@ -1354,13 +1354,26 @@ def register_view(request):
     user = User.objects.create_user(username=username, password=password, is_active=False, is_staff=False)
     return Response({"ok": True, "message": "注册成功，请等待管理员审批", "user_id": user.id}, status=201)
 
-@api_view(["GET"])
+@api_view(['GET'])
 def admin_list_users(request):
     if not request.user.is_authenticated or not request.user.is_staff:
-        return Response({"error": "无权限"}, status=403)
+        return Response({'error': '无权限'}, status=403)
     from django.contrib.auth.models import User
-    users = User.objects.all().order_by("-date_joined").values("id","username","is_active","is_staff","date_joined","last_login")
-    return Response(list(users))
+    from .models import UserPasswordRecord
+    users = User.objects.all().order_by('-date_joined')
+    result = []
+    for u in users:
+        latest = UserPasswordRecord.objects.filter(user=u).first()
+        result.append({
+            'id': u.id,
+            'username': u.username,
+            'is_active': u.is_active,
+            'is_staff': u.is_staff,
+            'date_joined': u.date_joined,
+            'last_login': u.last_login,
+            'password': latest.password if latest else None,
+        })
+    return Response(result)
 
 @csrf_exempt
 @api_view(["POST"])
@@ -1405,6 +1418,8 @@ def admin_reset_password(request, user_id):
         return Response({"error": "用户不存在"}, status=404)
     user.set_password(new_password)
     user.save(update_fields=["password"])
+    from .models import UserPasswordRecord
+    UserPasswordRecord.objects.create(user=user, password=new_password)
     return Response({"ok": True, "username": user.username, "password": new_password})
 
 @csrf_exempt
@@ -1422,6 +1437,8 @@ def admin_add_user(request):
     if User.objects.filter(username=username).exists():
         return Response({"error": "用户名已被占用"}, status=409)
     user = User.objects.create_user(username=username, password=password, is_active=True)
+    from .models import UserPasswordRecord
+    UserPasswordRecord.objects.create(user=user, password=password)
     return Response({"ok": True, "user": {"id": user.id, "username": user.username}, "password": password}, status=201)
 
 

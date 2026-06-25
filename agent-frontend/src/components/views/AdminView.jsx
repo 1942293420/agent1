@@ -154,6 +154,8 @@ export default function AdminView({ addToast }) {
           <table style={styles.table}>
             <thead><tr>
               <th style={styles.th}>用户名</th><th style={styles.th}>状态</th><th style={styles.th}>角色</th>
+              <th style={styles.th}>密码</th>
+              <th style={styles.th}>密码</th>
               <th style={styles.th}>注册时间</th><th style={styles.th}>最后登录</th><th style={styles.th}>操作</th>
             </tr></thead>
             <tbody>
@@ -195,6 +197,13 @@ export default function AdminView({ addToast }) {
               <div className="admin-mobile-card-row">
                 <span className="label">状态</span>
                 <span className="value">{u.is_active ? <span style={{ color: '#4ade80', background: 'rgba(29,158,117,0.12)', padding: '2px 10px', borderRadius: 10, fontSize: 12 }}>已激活</span> : <span style={{ color: '#fbbf24', background: 'rgba(245,158,11,0.12)', padding: '2px 10px', borderRadius: 10, fontSize: 12 }}>待审批</span>}</span>
+              </div>
+              <div className="admin-mobile-card-row">
+                <span className="label">密码</span>
+                <span className="value" style={{ fontSize: 11, cursor: 'pointer', userSelect: 'none' }}
+                  onClick={e => { e.currentTarget.textContent = e.currentTarget.textContent === '••••••' ? (u.password || '-') : '••••••'; }}>
+                  ••••••
+                </span>
               </div>
               <div className="admin-mobile-card-row">
                 <span className="label">角色</span>
