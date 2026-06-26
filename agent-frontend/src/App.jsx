@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Topbar from './components/Topbar';
+import MobileShell from './components/MobileShell';
 import DetailPanel from './components/DetailPanel';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppContext from './AppContext';
+import useMediaQuery from './hooks/useMediaQuery';
 import { api } from './api';
 
 // ── Lazy-loaded views ──
@@ -34,6 +36,7 @@ function PageLoader() {
 }
 
 function AppInner() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
 
@@ -93,6 +96,31 @@ function AppInner() {
     sessions, setSessions, workers, cronJobs, loading, addToast, openDetail, openModal,
     activeSessionId, setActiveSessionId };
 
+  const routesContent = (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tasks" element={<Tasks openModal={openModal} />} />
+          <Route path="/agents" element={<Agents />} />
+          <Route path="/skills" element={<Skills />} />
+          <Route path="/memory" element={<MemoryView />} />
+          <Route path="/sessions" element={<Sessions />} />
+          <Route path="/tokens" element={<TokensView />} />
+          <Route path="/workers" element={<WorkersView />} />
+          <Route path="/cron" element={<CronJobsView />} />
+          <Route path="/settings" element={<Settings addToast={addToast} />} />
+          <Route path="/monitor" element={<MonitorView />} />
+          <Route path="/output" element={<OutputView />} />
+          <Route path="/profile" element={<ProfileView />} />
+          <Route path="/admin" element={<AdminView />} />
+          <Route path="*" element={<Dashboard />} />
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
+  );
+
   return (
     <AppContext.Provider value={ctx}>
       <div className="bg-grid" aria-hidden="true" />
@@ -101,32 +129,14 @@ function AppInner() {
 
       <Topbar onMobileOpen={() => setMobileOpen(true)} />
 
-      <main className="main-content-v2">
-        <div className="view-container">
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/tasks" element={<Tasks openModal={openModal} />} />
-                <Route path="/agents" element={<Agents />} />
-                <Route path="/skills" element={<Skills />} />
-                <Route path="/memory" element={<MemoryView />} />
-                <Route path="/sessions" element={<Sessions />} />
-                <Route path="/tokens" element={<TokensView />} />
-                <Route path="/workers" element={<WorkersView />} />
-                <Route path="/cron" element={<CronJobsView />} />
-                <Route path="/settings" element={<Settings addToast={addToast} />} />
-                <Route path="/monitor" element={<MonitorView />} />
-                <Route path="/output" element={<OutputView />} />
-                <Route path="/profile" element={<ProfileView />} />
-                <Route path="/admin" element={<AdminView />} />
-                <Route path="*" element={<Dashboard />} />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </div>
-      </main>
+      {isMobile ? (
+        <MobileShell>{routesContent}</MobileShell>
+      ) : (
+        <main className="main-content-v2">
+          <div className="view-container">{routesContent}</div>
+        </main>
+      )}
+
       <DetailPanel type={detailType} data={detailData} onClose={closeDetail} />
       <Modal type={modalType} data={modalData} onClose={closeModal} />
       <Toast toasts={toasts} />

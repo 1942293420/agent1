@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api';
 import { useApp } from '../../AppContext';
+import useMediaQuery from '../../hooks/useMediaQuery';
 import MessageRenderer from '../chat/MessageRenderer';
-import '../chat/messageStyles.css';
+import '../chat/MessageRenderer.css';
 
 const MSG_GAP_MINUTES = 5;
 
@@ -88,8 +89,10 @@ function useResize(defaultSize, min, max, direction) {
 }
 
 export default function Sessions() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
   const { sessions, setSessions, agents, addToast, openModal, activeSessionId, setActiveSessionId } = useApp();
   const [active, setActive] = useState(activeSessionId);
+  const [showDetail, setShowDetail] = useState(false);  // master-detail toggle on mobile
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -236,6 +239,11 @@ export default function Sessions() {
     userScrolledUp.current = false;
     setActive(sessionId);
     setActiveSessionId(sessionId);
+    if (isMobile) setShowDetail(true);
+  };
+
+  const handleBack = () => {
+    setShowDetail(false);
   };
 
   const handleScroll = () => {
@@ -487,9 +495,19 @@ export default function Sessions() {
         </div>
 
         {/* Detail panel */}
-        <div className="session-detail-panel light" style={{ flex: 1, minWidth: 0 }}>
+        <div className={`session-detail-panel light${(isMobile && showDetail) ? ' active' : ''}`} style={{ flex: 1, minWidth: 0 }}>
           {activeSession ? (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              {/* Mobile back button */}
+              {isMobile && (
+                <div className="session-mobile-header">
+                  <button className="session-mobile-back" onClick={handleBack}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    返回
+                  </button>
+                  <span className="session-mobile-title">{activeSession.agent_name || '未指定'}</span>
+                </div>
+              )}
               {/* Header */}
               <div className="session-detail-header">
                 <div>
