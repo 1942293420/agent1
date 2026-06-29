@@ -503,6 +503,8 @@ textarea.form-input{resize:vertical;min-height:80px}
 /* ─── Chat Sidebar ─── */
 .chat-sidebar{display:flex}
 @media(max-width:768px){
+  html,body{height:auto;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #root{min-height:100dvh;min-height:100vh;height:auto;overflow:visible}
   .chat-sidebar{position:fixed;left:0;top:0;bottom:0;z-index:200;transform:translateX(-100%);box-shadow:0 0 60px rgba(0,0,0,.3)}
   .chat-sidebar.open{transform:translateX(0)}
   /* 修复手机端消息区域无法滚动 */
@@ -575,8 +577,8 @@ textarea.form-input{resize:vertical;min-height:80px}
 
 /* 640px — phone: compact mode */
 @media(max-width:640px){
-  html,body{overflow-x:hidden;-webkit-overflow-scrolling:touch}
-  #root{display:flex;flex-direction:column;height:100dvh;height:100vh;overflow:hidden}
+  html,body{height:auto;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  #root{display:flex;flex-direction:column;min-height:100dvh;min-height:100vh;height:auto;overflow:visible}
   .topbar-v2{padding:0 8px;height:48px}
   .topbar-v2-username{display:none}
   .topbar-v2-logo{padding:0 6px}
