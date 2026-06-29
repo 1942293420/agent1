@@ -133,12 +133,14 @@ export default function Sessions() {
   const agentRole = activeSession ? (agentRoles[activeSession.agent_name] || '') : '';
 
   // Lock view-container: no outer scroll for sessions page
+  // Desktop: full lock (no-scroll), Mobile: layout-only lock (no-scroll-mobile)
   useEffect(() => {
     const vc = document.querySelector('.view-container');
     if (!vc) return;
-    vc.classList.add('no-scroll');
-    return () => vc.classList.remove('no-scroll');
-  }, []);
+    const cls = isMobile ? 'no-scroll-mobile' : 'no-scroll';
+    vc.classList.add(cls);
+    return () => vc.classList.remove(cls);
+  }, [isMobile]);
 
   // Poll messages
   useEffect(() => {
