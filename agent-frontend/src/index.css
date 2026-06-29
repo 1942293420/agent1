@@ -21,8 +21,8 @@
   --transition:0.18s ease;
 }
 html{font-size:14px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
-body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);min-height:100dvh;min-height:100vh;overflow-x:hidden}
-#root{display:flex;flex-direction:column;min-height:100dvh;min-height:100vh}
+body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-primary);height:100dvh;height:100vh;overflow:hidden}
+#root{display:flex;flex-direction:column;height:100dvh;height:100vh;overflow:hidden}
 
 /* ─── Background Effects ─── */
 .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -139,6 +139,8 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 .view-container::-webkit-scrollbar{width:5px}
 .view-container::-webkit-scrollbar-track{background:transparent}
 .view-container::-webkit-scrollbar-thumb{background:var(--border-subtle);border-radius:3px}
+/* Sessions page — no outer scrolling, inner panels manage their own scroll */
+.view-container.no-scroll{overflow:hidden;padding:0;display:flex;flex-direction:column}
 
 /* ─── View Header ─── */
 .view-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
@@ -312,7 +314,7 @@ body{font-family:var(--font-sans);background:var(--bg-deep);color:var(--text-pri
 
 /* ─── Sessions ─── */
 /* Lock sessions page — no outer scrolling */
-.session-view-container{overflow:hidden;padding:12px 20px 0;display:flex;align-items:flex-start;justify-content:center;flex:1;min-height:0}
+.session-view-container{overflow:hidden;padding:12px 20px 0;display:flex;align-items:stretch;justify-content:center;flex:1;min-height:0}
 .session-layout{display:flex;gap:0;width:100%;max-width:1400px;overflow:hidden;margin:0 auto;flex:1;min-height:0}
 .session-list-panel{display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding:0 8px}
 .session-list-panel::-webkit-scrollbar{width:3px}
@@ -573,8 +575,8 @@ textarea.form-input{resize:vertical;min-height:80px}
 
 /* 640px — phone: compact mode */
 @media(max-width:640px){
-  html,body{height:auto;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  #root{display:flex;flex-direction:column;min-height:100dvh;min-height:100vh}
+  html,body{overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  #root{display:flex;flex-direction:column;height:100dvh;height:100vh;overflow:hidden}
   .topbar-v2{padding:0 8px;height:48px}
   .topbar-v2-username{display:none}
   .topbar-v2-logo{padding:0 6px}
@@ -1005,7 +1007,7 @@ textarea.form-input{resize:vertical;min-height:80px}
 .bottleneck-badge{font-size:11px;color:#E24B4A;background:rgba(226,75,74,0.1);padding:2px 8px;border-radius:10px}
 
 /* ─── Topbar v2 — 顶部导航栏 ─── */
-.main-content-v2{flex:1;min-width:0;display:flex;flex-direction:column;overflow:visible;min-height:0}
+.main-content-v2{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .topbar-v2{height:52px;background:rgba(13,19,32,.95);border-bottom:1px solid var(--border-subtle);display:flex;align-items:center;padding:0 16px;gap:0;flex-shrink:0;backdrop-filter:blur(10px);z-index:100;position:relative}
 .topbar-v2-left{display:flex;align-items:center;gap:0;flex:1;min-width:0}
 .topbar-v2-logo{display:flex;align-items:center;gap:8px;cursor:pointer;padding:0 12px;margin-right:4px;transition:opacity var(--transition);flex-shrink:0}

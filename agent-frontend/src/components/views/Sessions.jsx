@@ -132,6 +132,14 @@ export default function Sessions() {
   };
   const agentRole = activeSession ? (agentRoles[activeSession.agent_name] || '') : '';
 
+  // Lock view-container: no outer scroll for sessions page
+  useEffect(() => {
+    const vc = document.querySelector('.view-container');
+    if (!vc) return;
+    vc.classList.add('no-scroll');
+    return () => vc.classList.remove('no-scroll');
+  }, []);
+
   // Poll messages
   useEffect(() => {
     if (!active) { setMessages([]); return; }
@@ -497,7 +505,7 @@ export default function Sessions() {
         {/* Detail panel */}
         <div className={`session-detail-panel light${(isMobile && showDetail) ? ' active' : ''}`} style={{ flex: 1, minWidth: 0 }}>
           {activeSession ? (
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               {/* Mobile back button */}
               {isMobile && (
                 <div className="session-mobile-header">
@@ -561,7 +569,7 @@ export default function Sessions() {
               {/* Chat + Output split */}
               <div style={{ flex: 1, display: 'flex', minHeight: 0, position: 'relative' }}>
                 {/* Messages panel */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
                   <div className={`session-messages${animSwitch ? ' switch-enter' : ''}`} ref={chatContainer}
                     onScroll={handleScroll}>
                     {loadingMsgs && messages.length === 0 ? (
