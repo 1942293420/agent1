@@ -39,8 +39,11 @@ def _api(path, method="get", data=None):
         return {}
 
 def _run_hermes(msg, profile):
-    r = subprocess.run(["hermes","chat","-q",msg,"-p",profile,"-Q","--yolo"],
-        capture_output=True,text=True,timeout=HERMES_TIMEOUT,cwd=os.path.expanduser("~"))
+    env = os.environ.copy()
+    env["HERMES_PROFILE"] = profile
+    r = subprocess.run(["hermes","chat","-q",msg,"-Q","--yolo"],
+        capture_output=True,text=True,timeout=HERMES_TIMEOUT,cwd=os.path.expanduser("~"),
+        env=env,stdin=subprocess.DEVNULL)
     raw = r.stdout.strip()
     if raw.startswith("session_id:"):
         raw = raw.split("\n",1)[1].strip() if "\n" in raw else ""
@@ -164,12 +167,14 @@ def process_message(msg_id):
         _push_msg(conv_id, f"✅ 已收到，{conv_agent}处理中...", "received")
         import subprocess as _sp
         try:
+            env = os.environ.copy()
+            env["HERMES_PROFILE"] = profile
             proc = _sp.run(
                 ["hermes", "chat", "-q", user_msg,
-                 "-p", profile, "-Q", "--yolo",
+                 "-Q", "--yolo",
                  "-t", "terminal,file,web,feishu_doc,feishu_drive"],
                 capture_output=True, text=True, timeout=300,
-                cwd=os.path.expanduser("~")
+                cwd=os.path.expanduser("~"), env=env, stdin=_sp.DEVNULL
             )
             reply = proc.stdout.strip()
             if reply.startswith("session_id:"):

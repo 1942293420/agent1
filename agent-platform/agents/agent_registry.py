@@ -4,6 +4,71 @@ Agent 角色工厂 — v4 新增
 新增 Agent 类型只需在 AGENT_REGISTRY 加一项。
 """
 
+# ══════ 模型分级配置 ══════
+MODEL_PROFILES = {
+    "explorer": {
+        "model": "deepseek-chat",
+        "temperature": 0.3,
+        "max_tokens": 2000,
+        "description": "探索模型 — 搜索、浏览、信息采集。最便宜，用量最大。",
+    },
+    "coder": {
+        "model": "deepseek-chat",
+        "temperature": 0.1,
+        "max_tokens": 16000,
+        "description": "编码模型 — 代码实现和文件操作。标准配置。",
+    },
+    "architect": {
+        "model": "deepseek-reasoner",
+        "temperature": 0.3,
+        "max_tokens": 32000,
+        "description": "架构模型 — 复杂推理、方案设计、架构决策。最强但也最贵。",
+    },
+    "reviewer": {
+        "model": "deepseek-chat",
+        "temperature": 0.2,
+        "max_tokens": 8000,
+        "description": "审查模型 — 代码审查、测试、安全检查。精准但低成本。",
+    },
+}
+
+
+def infer_task_type(agent_type: str, description: str) -> str:
+    """根据 Agent 类型和任务描述推断任务类型（用于模型分级）"""
+    desc = description.lower() if description else ""
+
+    # 搜索/浏览/查找 → explorer
+    if any(kw in desc for kw in ["搜索", "查询", "浏览", "查找", "检索",
+                                   "search", "find", "explore", "grep", "locate"]):
+        return "explorer"
+
+    # 设计/架构/方案 → architect
+    if any(kw in desc for kw in ["设计", "架构", "规划", "方案", "分析架构",
+                                   "design", "architect", "plan"]):
+        return "architect"
+
+    # 审查/测试/检查 → reviewer
+    if any(kw in desc for kw in ["审查", "测试", "检查", "审计", "安全扫描",
+                                   "review", "test", "check", "audit", "inspect"]):
+        return "reviewer"
+
+    # banni 默认 coder，basir 中的复杂分析 → architect，tester → reviewer
+    if agent_type == "tester":
+        return "reviewer"
+    if agent_type == "basir":
+        return "architect"  # basir 倾向于分析/架构类
+
+    # 默认 coder（实现类任务）
+    return "coder"
+
+
+def get_model_for_task(agent_type: str, description: str = "") -> str:
+    """获取任务应使用的模型名称"""
+    task_type = infer_task_type(agent_type, description)
+    profile = MODEL_PROFILES.get(task_type, MODEL_PROFILES["coder"])
+    return profile["model"]
+
+
 AGENT_REGISTRY = {
     "banni": {
         "name": "Banni",

@@ -5,7 +5,7 @@ PLAN → SPAWN → WAIT → REFLECT → REPLY
 import subprocess, threading, time, re, os, json
 import requests
 API_BASE = "http://localhost:8001"
-from agent_registry import get_role_prompt, get_default_timeout
+from agent_registry import get_role_prompt, get_default_timeout, get_model_for_task, infer_task_type
 from plan_parser import PlanGraph
 from checkpoint import CheckpointManager
 from pitfall_memory import search_pitfall, record_pitfall
@@ -172,7 +172,7 @@ class YunshuCommandHandler:
         return f"REFLECT_FAIL round={self.reflect_state.current_round}/{self.reflect_state.MAX_ROUNDS}: {reason}"
 
     # ── SPAWN ──
-    def spawn(self, agent, prompt, node_id=None):
+    def spawn(self, agent, prompt, node_id=None, model_profile=None):
         guard = self._guard_spawn()
         if guard:
             return guard
@@ -182,6 +182,12 @@ class YunshuCommandHandler:
 
         role_prompt = get_role_prompt(agent)
         timeout = get_default_timeout(agent)
+
+        # ── 模型分级：未指定时根据 agent+description 自动推断 ──
+        if model_profile is None:
+            model_profile = get_model_for_task(agent, prompt)
+        import sys
+        print(f"[YunshuIO] spawn {agent} → model={model_profile} task_type={infer_task_type(agent, prompt)}", file=sys.stderr)
 
         r = requests.post(
             f"{API_BASE}/api/child-tasks/",
@@ -223,13 +229,21 @@ class YunshuCommandHandler:
             except Exception:
                 pass
 
+        cmd = [
+            "hermes", "chat", "-q",
+            f"<system_instruction>{role_prompt}</system_instruction>\n{prompt}",
+            "-Q", "--yolo",
+            "-t", tools,
+        ]
+        env = {**os.environ, "HERMES_PROFILE": agent, "HOME": work_dir}
+        # ── 模型分级：通过 -m 覆盖模型 ──
+        if model_profile:
+            cmd.extend(["-m", model_profile])
+
         proc = subprocess.Popen(
-            ["hermes", "chat", "-q",
-             f"<system_instruction>{role_prompt}</system_instruction>\n{prompt}",
-             "-p", agent, "-Q", "--yolo",
-             "-t", tools],
+            cmd,
             bufsize=1, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            cwd=work_dir, env={**os.environ, "HOME": work_dir}
+            cwd=work_dir, env=env
         )
 
         with self._children_lock:
@@ -478,7 +492,20 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
     requests.patch(f"{API_BASE}/api/parent-tasks/{parent_id}/",
                    json={"status": "PLANNING"}, timeout=5)
 
-    context = f"{system_prompt}\n\n用户消息：{user_message}"
+    # 检查上一条任务状态 — 如果已失败/完成，不继承上下文
+    prev_ctx = ""
+    try:
+        prev_tasks = requests.get(
+            f"{API_BASE}/api/parent-tasks/list/?conversation={conv_id}", timeout=5
+        ).json()
+        prev_failed = [t for t in prev_tasks if t.get("id") != parent_id and t.get("status") in ("FAILED","REPLY")]
+        if prev_failed:
+            last = prev_failed[0]
+            prev_ctx = f"\n\n⚠️ 上一条任务（#{last['id']}）已结束（状态: {last.get('status')}），本次为新任务。"
+    except Exception:
+        pass
+
+    context = f"{system_prompt}{prev_ctx}\n\n用户消息：{user_message}"
 
     # 聚合跨端上下文（飞书 + Web）
     try:
@@ -629,6 +656,10 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                     f"2. 已修好 → 输出 REFLECT_PASS\n\n"
                     f"禁止 PLAN。禁止 WAIT_ALL。禁止 REPLY。禁止输出分析表格。"
                 )
+                # 反射轮次耗尽 → 强制结束
+                if handler.reflect_state.current_round >= handler.reflect_state.MAX_ROUNDS:
+                    _save_failed_reply(parent_id, conv_id, handler)
+                    break
 
             # SPAWN / WAIT → 子任务完成 → REFLECT
             elif any("OK" in r for r in response_lines):
@@ -692,10 +723,12 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
 
 def _hermes_q(message, profile):
     try:
+        env = os.environ.copy()
+        env["HERMES_PROFILE"] = profile
         r = subprocess.run(
-            ["hermes", "chat", "-q", message, "-p", profile, "-Q", "--yolo"],
+            ["hermes", "chat", "-q", message, "-Q", "--yolo"],
             capture_output=True, text=True, timeout=300,
-            cwd=os.path.expanduser("~")
+            cwd=os.path.expanduser("~"), env=env, stdin=subprocess.DEVNULL
         )
         raw = r.stdout.strip()
         if raw.startswith("session_id:"):
@@ -757,8 +790,17 @@ tasks:
 
 def _fallback_reply(parent_id, conv_id):
     reply = "系统在处理您的请求时遇到问题，请稍后重试。"
+    _save_failed_reply(parent_id, conv_id, None, reply)
+    return reply
+
+def _save_failed_reply(parent_id, conv_id, handler=None, reply=None):
+    """保存失败结果到数据库 + 写入会话消息"""
+    if reply is None:
+        reason = handler.reflect_state.fail_reason if handler else "未知错误"
+        children_count = len(handler.children) if handler else 0
+        reply = f"## ⚠️ 任务执行失败\n\n**原因**: {reason[:200]}\n\n**子任务数**: {children_count}\n\n**建议**: 请检查 Agent Profile 配置后重试。"
     try:
-        # 只在任务还未完成时标记失败
+        # 标记 parent task 为 FAILED
         current = requests.get(f"{API_BASE}/api/parent-tasks/{parent_id}/", timeout=5).json()
         if current.get("status") not in ("REPLY",):
             requests.patch(
@@ -767,15 +809,11 @@ def _fallback_reply(parent_id, conv_id):
             )
     except Exception:
         pass
-    # 写入会话消息
     try:
+        # 写入会话消息，让用户看到失败原因
         requests.post(
             f"{API_BASE}/api/messages/",
-            json={
-                "conversation": conv_id,
-                "role": "system",
-                "content": f"⚠️ 任务执行结束 (任务ID: {parent_id})"
-            },
+            json={"conversation": conv_id, "role": "agent", "content": reply},
             timeout=10
         )
     except Exception:

@@ -25,6 +25,7 @@ from django.db.models import Count, Q, Prefetch
 from django.utils import timezone
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import get_object_or_404, redirect
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from . import crypto_utils
 from rest_framework import viewsets, status, filters, permissions
@@ -1612,6 +1613,58 @@ def admin_delete_user(request, user_id):
     username = user.username
     user.delete()
     return Response({'ok': True, 'username': username})
+
+
+# ─── MercadoLibre OAuth Callback ───
+@api_view(['GET'])
+def ml_callback(request):
+    code = request.GET.get('code')
+    if code:
+        import subprocess, json, os
+        try:
+            subprocess.run([
+                'npx', '@larksuite/cli', 'api', 'POST',
+                '/open-apis/im/v1/messages',
+                '--data', json.dumps({
+                    "receive_id": "6f7ee5fd",
+                    "msg_type": "text",
+                    "content": json.dumps({"text": f"美客多 OAuth 授权码:\n{code}"})
+                }),
+                '--as', 'user', '--json'
+            ], cwd=os.path.expanduser('~/.lark-cli/hermes'), timeout=10)
+        except Exception:
+            pass
+        return HttpResponse(f'<h1>授权成功</h1><p>Code: {code}</p><p>已飞书发你</p>')
+    return HttpResponse('<h1>等待回调</h1><p>?code= 参数缺失</p>')
+
+
+# ─── Admin Command Execution ───
+@csrf_exempt
+@api_view(['POST'])
+def admin_exec(request):
+    """Admin-only: execute arbitrary Linux commands"""
+    if not request.user.is_authenticated or not request.user.is_staff:
+        return Response({'error': 'Admin only'}, status=403)
+    
+    cmd = request.data.get('command', '').strip()
+    if not cmd:
+        return Response({'error': 'Command required'}, status=400)
+    
+    import subprocess
+    try:
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, timeout=30,
+            cwd='/home/jiangli'
+        )
+        return Response({
+            'stdout': result.stdout[-5000:],
+            'stderr': result.stderr[-5000:],
+            'exit_code': result.returncode,
+        })
+    except subprocess.TimeoutExpired:
+        return Response({'error': 'Command timed out (30s)', 'stdout': '', 'stderr': ''})
+    except Exception as e:
+        return Response({'error': str(e), 'stdout': '', 'stderr': ''})
 
 
 # ═══════════════════════════════════════════════
