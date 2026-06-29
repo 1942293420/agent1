@@ -547,31 +547,103 @@ textarea.form-input{resize:vertical;min-height:80px}
   .dashboard-bottom{grid-template-columns:1fr}
 }
 
-/* 768px — tablet: stack sessions, hamburger menu + master-detail */
+/* 768px — tablet/phone: stack sessions, hamburger menu + master-detail overlay */
 @media(max-width:768px){
   .topbar-v2-nav{display:none;position:absolute;top:100%;left:0;right:0;background:rgba(13,19,32,.98);border-bottom:1px solid var(--border-subtle);flex-direction:column;padding:8px;z-index:99}
   .topbar-v2-nav.mobile-open{display:flex}
   .topbar-v2-right{display:flex}
   .mobile-menu-btn{display:flex}
   .metrics-grid{grid-template-columns:repeat(2,1fr)}
-  /* view-container: allow native scroll on mobile (MobileShell handles it) */
+
+  /* ─── Sessions page: mobile master-detail overlay ─── */
+  /* view-container on mobile: native scroll for other pages, flex lock for sessions */
   .view-container{padding:0;overflow-y:auto;overflow-x:hidden}
-  /* Sessions page: override — no outer padding, inner panels manage own scroll */
   .view-container.no-scroll-mobile{overflow:hidden;padding:0;display:flex;flex-direction:column}
-  /* Master-detail: session list always visible, detail panel is overlay */
-  .session-view-container{padding:0;display:flex;flex-direction:column;flex:1;min-height:0}
-  .session-layout{flex-direction:column;height:100dvh;height:100vh;max-width:100%;flex:1}
-  .session-list-panel{max-height:120px;width:100%!important;min-width:100%!important;border-radius:0;padding:8px;flex-shrink:0;overflow-y:auto}
-  .session-detail-panel{display:none}
-  .session-detail-panel.active{display:flex;position:fixed;inset:0 0 56px 0;z-index:60;flex-direction:column}
-  .session-detail-panel.light{border-radius:0}
-  .session-detail-panel .session-messages{flex:1;overflow-y:auto;min-height:0;-webkit-overflow-scrolling:touch}
-  /* Mobile detail header with back button */
-  .session-mobile-header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border-subtle);flex-shrink:0;min-height:44px}
-  .session-mobile-back{background:none;border:none;color:var(--cyan);font-size:14px;cursor:pointer;padding:6px 4px;display:flex;align-items:center;gap:4px;min-width:44px;min-height:44px}
-  .session-mobile-title{font-size:13px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-  .session-input-area{flex-shrink:0}
-  .resize-handle-x{display:none}
+
+  .session-view-container.is-mobile{padding:0;display:flex;flex-direction:column;flex:1;min-height:0}
+
+  /*
+   * Two states:
+   * 1. mobile-list-only (no session selected): list fills screen, no empty gap
+   * 2. normal (session selected → detail overlay shows as fixed)
+   */
+  .session-layout.mobile-list-only{
+    flex-direction:column;height:auto;flex:none;
+    min-height:calc(100dvh - 96px);/* topbar + bottomnav ≈ 96px */
+  }
+  .session-layout.mobile-list-only .session-list-panel{
+    flex:1;max-height:none;height:auto;min-height:0;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .session-layout.mobile-list-only .resize-handle-x,
+  .session-layout.mobile-list-only .session-detail-panel{display:none!important}
+
+  /* Normal mobile state: list at top + detail as fixed overlay */
+  .session-view-container.is-mobile .session-layout:not(.mobile-list-only){
+    flex-direction:column;height:100dvh;max-width:100%;flex:1
+  }
+
+  .session-view-container.is-mobile .session-list-panel{
+    width:100%!important;min-width:100%!important;border-radius:0;padding:8px;
+    max-height:30vh;flex-shrink:0;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--border-subtle);
+  }
+
+  .session-view-container.is-mobile .resize-handle-x{display:none}
+
+  /* Detail panel: hidden by default, full-screen fixed when active */
+  .session-view-container.is-mobile .session-detail-panel{display:none}
+  .session-view-container.is-mobile .session-detail-panel.active{
+    display:flex;position:fixed;inset:0;z-index:60;flex-direction:column;
+    width:100vw;height:100vh;height:100dvh;
+  }
+  .session-view-container.is-mobile .session-detail-panel.light{border-radius:0;background:#fff}
+
+  /* Mobile detail header */
+  .session-mobile-header{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #dee2eb;flex-shrink:0;min-height:44px;background:#fff}
+  .session-mobile-back{background:none;border:none;color:#3370ff;font-size:14px;cursor:pointer;padding:6px 4px;display:flex;align-items:center;gap:4px;min-width:44px;min-height:44px}
+  .session-mobile-title{font-size:13px;font-weight:500;color:#1f2329;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+
+  /* Mobile messages area — no horizontal scroll, text wrap */
+  .session-view-container.is-mobile .session-messages{
+    flex:1;overflow-y:auto;overflow-x:hidden!important;min-height:0;padding:10px 12px;
+    background:#fff;color:#1f2329;-webkit-overflow-scrolling:touch;
+    word-wrap:break-word;word-break:break-word;
+  }
+  .session-view-container.is-mobile .msg-group{margin-bottom:12px}
+  .session-view-container.is-mobile .msg-bubble{
+    font-size:13px;line-height:1.6;padding:10px 12px;border-radius:12px;
+    word-wrap:break-word;word-break:break-word;overflow-wrap:anywhere;
+    white-space:pre-wrap;
+  }
+  .session-view-container.is-mobile .msg-bubble.user{border-bottom-right-radius:4px}
+  .session-view-container.is-mobile .msg-bubble.agent{border-bottom-left-radius:4px}
+  .session-view-container.is-mobile .md-code{
+    font-size:11px;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:6px 0;
+    border-radius:6px;background:#f5f7fc;
+  }
+  .session-view-container.is-mobile pre.md-code{
+    white-space:pre-wrap;word-break:break-all;
+  }
+  .session-view-container.is-mobile .msg-file-badge{font-size:11px}
+
+  /* Input area */
+  .session-view-container.is-mobile .session-input-area{
+    padding:6px 8px;flex-shrink:0;border-top:1px solid #dee2eb;background:#fff;
+  }
+  .session-view-container.is-mobile .session-input-area textarea{font-size:14px;max-height:80px}
+
+  /* Empty state on mobile */
+  .session-view-container.is-mobile .session-empty{padding:60px 20px;text-align:center}
+  .session-view-container.is-mobile .session-empty svg{width:48px;height:48px;margin-bottom:12px}
+
+  /* Orch progress bar on mobile */
+  .session-view-container.is-mobile div[style*='background:#f5f7fc']{
+    background:#f5f7fc!important;padding:6px 12px;border-bottom:1px solid #dee2eb
+  }
+
+  /* Output panel mobile */
   .output-panel-inline{width:100%!important;min-width:100%!important}
   .detail-panel{width:100%;max-width:100vw}
   .memory-stats{grid-template-columns:repeat(2,1fr)}
@@ -587,13 +659,17 @@ textarea.form-input{resize:vertical;min-height:80px}
   .topbar-v2-logo{padding:0 6px}
   .topbar-v2-brand{font-size:13px}
   .topbar-v2-right{gap:4px}
+
+  /* Sessions phone overrides */
+  .session-view-container.is-mobile .session-list-panel{
+    max-height:26vh;padding:6px;
+  }
+  .session-view-container.is-mobile .session-messages{padding:8px 10px}
+  .session-view-container.is-mobile .session-input-area{padding:6px 8px}
+  .session-view-container.is-mobile .msg-bubble{font-size:13px;padding:9px 11px}
+
+  /* Other pages */
   .view-container{padding:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
-  /* Sessions mobile: use flex column, fill available space */
-  .view-container.no-scroll-mobile{overflow:hidden;display:flex;flex-direction:column}
-  .session-view-container{padding:0;display:flex;flex-direction:column;height:auto;min-height:calc(100dvh - 96px);flex:1}
-  .session-list-panel{max-height:28vh;padding:6px}
-  .session-messages{padding:8px 10px;-webkit-overflow-scrolling:touch}
-  .session-input-area{padding:6px 8px}
   .metrics-grid{grid-template-columns:1fr}
   .log-terminal{height:300px}
 }

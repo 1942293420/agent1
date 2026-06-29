@@ -457,8 +457,8 @@ export default function Sessions() {
   const msgGroups = buildMessageGroups();
 
   return (
-    <div className="session-view-container">
-      <div className="session-layout">
+    <div className={`session-view-container${isMobile ? ' is-mobile' : ''}`}>
+      <div className={`session-layout${(isMobile && (!activeSession || !showDetail)) ? ' mobile-list-only' : ''}`}>
         {/* Session list — resizable */}
         <div className="session-list-panel light" style={{ width: listResize.size, minWidth: listResize.size, flexShrink: 0 }}>
           <div style={{padding:'10px 12px',borderBottom:'1px solid rgba(255,255,255,0.06)',flexShrink:0}}>
