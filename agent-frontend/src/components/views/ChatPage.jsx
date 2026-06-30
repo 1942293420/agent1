@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { api } from '../../api';
 
 function fmt(t) { if (!t) return ''; try { return new Date(t).toLocaleTimeString(); } catch { return ''; } }
@@ -31,7 +31,13 @@ const orchColors = {
   stopped: { bg:'rgba(226,75,74,0.1)',    border:'rgba(226,75,74,0.4)',   text:'#E24B4A' },
 };
 
+// Redirect to unified Sessions page
 export default function ChatPage() {
+  return <Navigate to="/sessions" replace />;
+}
+
+/* ─── legacy ChatPage preserved below for reference ─── */
+const _ChatPage = () => {
   const [conversations, setConversations] = useState([]);
   const [agents, setAgents] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
@@ -469,4 +475,4 @@ export default function ChatPage() {
       )}
     </div>
   );
-}
+};

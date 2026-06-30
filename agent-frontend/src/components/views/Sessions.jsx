@@ -142,12 +142,18 @@ export default function Sessions() {
     return () => vc.classList.remove(cls);
   }, [isMobile]);
 
-  // Poll messages
+  // SSE real-time messages + polling fallback
   useEffect(() => {
     if (!active) { setMessages([]); return; }
     let cancelled = false;
+    let eventSource = null;
+    let pollInterval = null;
+    let reconnectDelay = 1000;
+    let sseActive = true;
+
     setLoadingMsgs(true);
-    const poll = async () => {
+
+    const fetchMessages = async () => {
       try {
         const data = await api.get('/conversations/' + active + '/');
         if (cancelled) return;
@@ -155,11 +161,54 @@ export default function Sessions() {
         setSessions(prev => prev.map(s => s.id === data.id
           ? { ...s, message_count: data.message_count, last_message: data.last_message } : s));
         setLoadingMsgs(false);
-      } catch { if (cancelled) return; setLoadingMsgs(false); }
+      } catch { if (!cancelled) setLoadingMsgs(false); }
     };
-    poll();
-    const interval = setInterval(poll, 3000);
-    return () => { cancelled = true; clearInterval(interval); };
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/events/?conversation_id=' + active);
+
+        eventSource.addEventListener('message-update', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            // Only refresh if the event is for our active conversation
+            if (data.conversation_id == active) {
+              fetchMessages();
+            }
+          } catch { /* ignore parse errors */ }
+        });
+
+        eventSource.onerror = () => {
+          if (cancelled) return;
+          eventSource.close();
+          sseActive = false;
+          // Exponential backoff reconnect: 1s → 2s → 4s → max 10s
+          reconnectDelay = Math.min(reconnectDelay * 2, 10000);
+          // Fallback to polling if SSE fails after first attempt
+          if (!pollInterval) {
+            pollInterval = setInterval(fetchMessages, 3000);
+          }
+        };
+
+        eventSource.onopen = () => {
+          reconnectDelay = 1000; // reset backoff on successful connect
+        };
+      } catch {
+        // EventSource constructor failed — fall back to polling immediately
+        sseActive = false;
+        pollInterval = setInterval(fetchMessages, 3000);
+      }
+    };
+
+    // Initial fetch + SSE connect
+    fetchMessages();
+    connectSSE();
+
+    return () => {
+      cancelled = true;
+      if (eventSource) eventSource.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [active]);
 
   // Poll orchestration state
@@ -600,10 +649,11 @@ export default function Sessions() {
                           const group = item;
                           const firstMsg = group.msgs[0];
                           const isUser = group.role === 'user';
+                          const isFeishu = firstMsg.source === 'feishu';
                           return (
                             <div key={group.key} className={`msg-group ${isUser ? 'msg-group-user' : 'msg-group-agent'}`}>
                               <div className="msg-sender">
-                                {isUser ? '👤 用户' : '🤖 Agent'}
+                                {isUser ? (isFeishu ? '💬 飞书用户' : '👤 Web用户') : '🤖 Agent'}
                               </div>
                               {group.msgs.map((msg, idx) => (
                                 <div key={msg.id}
@@ -612,6 +662,9 @@ export default function Sessions() {
                                   onMouseLeave={() => setHoveredMsgId(null)}
                                 >
                                   <div className={`msg-bubble ${msg.role}${idx === 0 ? ' msg-bubble-first' : ''}`}>
+                                    {msg.source === 'feishu' && (
+                                      <span className="msg-source-tag feishu" title="来自飞书">💬</span>
+                                    )}
                                     <button
                                       onClick={(e) => { e.stopPropagation(); copyText(msg); }}
                                       className={`msg-copy-btn${hoveredMsgId === msg.id || copiedId === msg.id ? ' visible' : ''}`}

@@ -41,7 +41,7 @@ def event_stream(request):
                 try: mq = mq.filter(conversation_id=int(conversation_id))
                 except: pass
             for m in mq.values('id','conversation_id','role','content','source','created_at','processed').order_by('created_at'):
-                yield _evt('message-update', {'id':m['id'],'conversation_id':m['conversation_id'],'role':m['role'],'content':m['content'][:200],'source':m['source'],'created_at':m['created_at'].isoformat(),'processed':m['processed']})
+                yield _evt('message-update', {'id':m['id'],'conversation_id':m['conversation_id'],'role':m['role'],'content':m['content'],'source':m['source'],'created_at':m['created_at'].isoformat(),'processed':m['processed']})
 
             if cycle % 15 == 0:
                 for w in CronJob.objects.filter(name__icontains='Worker').values('job_id','name','schedule','agent__name','last_run_at','last_status','next_run_at','enabled'):
