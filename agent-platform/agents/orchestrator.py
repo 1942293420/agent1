@@ -198,7 +198,7 @@ def _parse_plan_from_text(text: str, valid_agent_names: set) -> Optional[Executi
         
         plan_steps.append(PlanStep(
             id=s.get('id', f'step_{i+1}'),
-            agent='小温',
+            agent='云筑(Banni)',
             action=action,
             command=s.get('command', ''),
             depends_on=s.get('depends_on', []),

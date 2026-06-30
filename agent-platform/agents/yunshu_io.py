@@ -10,6 +10,18 @@ from plan_parser import PlanGraph
 from checkpoint import CheckpointManager
 from pitfall_memory import search_pitfall, record_pitfall
 
+
+def _push_progress(conv_id, msg, source="web"):
+    """推送进度节点消息到聊天界面（静默失败不影响主流程）"""
+    try:
+        requests.post(
+            f"{API_BASE}/api/messages/",
+            json={"conversation": conv_id, "role": "system", "content": msg, "source": source},
+            timeout=5
+        )
+    except Exception:
+        pass
+
 # Django ORM (already configured by worker — import silently if available)
 try:
     from agents.models import ParentTask, TaskNode
@@ -93,10 +105,11 @@ class ReflectState:
 
 
 class YunshuCommandHandler:
-    def __init__(self, parent_id, conv_id, agent_profile="banni"):
+    def __init__(self, parent_id, conv_id, agent_profile="banni", source="web"):
         self.parent_id = parent_id
         self.conv_id = conv_id
         self.profile = agent_profile
+        self.source = source  # 消息来源: "web" | "feishu"
         self.children = {}
         self._children_lock = threading.Lock()  # P0 修复：线程安全
         self._max_spawn = 3  # 护栏上限，PLAN 可调整
@@ -113,6 +126,13 @@ class YunshuCommandHandler:
 
     # ── PLAN ──
     def handle_plan(self, plan_text):
+        # ── PLAN FAIL 是系统提示词要求的合规响应（无任务），非解析错误 ──
+        stripped = plan_text.strip()
+        if stripped.upper().startswith("FAIL"):
+            import sys
+            print(f"[YunshuIO] PLAN FAIL (无任务): {stripped[:100]}", file=sys.stderr)
+            return "OK no_task"
+
         plan = PlanGraph.parse(plan_text)
         if not plan:
             return "ERROR PLAN 解析失败"
@@ -372,6 +392,10 @@ class YunshuCommandHandler:
     def reply(self, markdown):
         if not markdown or not markdown.strip():
             return "ERROR 回复不能为空"
+        if _looks_like_code_or_garbage(markdown):
+            import sys
+            print(f"[YunshuIO] ⚠️ reply()出口校验：拒绝疑似代码/测试内容", file=sys.stderr)
+            return "ERROR 回复疑似代码/测试内容，拒绝保存"
         requests.patch(
             f"{API_BASE}/api/parent-tasks/{self.parent_id}/",
             json={"status": "REPLY", "final_reply": markdown.strip()}, timeout=10
@@ -407,6 +431,12 @@ def execute_plan_graph(handler: YunshuCommandHandler, plan: PlanGraph) -> dict:
     print(f"[YunshuIO] PlanGraph: {len(groups)} 组, "
           f"共 {sum(len(g) for g in groups)} 个任务", file=sys.stderr)
 
+    # ── 推送 PLAN 概览到聊天 ──
+    node_list = ", ".join(f"{n.agent_type}({n.task_id})" for n in plan.nodes)
+    _push_progress(handler.conv_id,
+        f"📋 PLAN: {len(plan.nodes)} 节点, {len(groups)} 组 — {node_list}",
+        source=handler.source)
+
     for group_idx, group in enumerate(groups):
         print(f"[YunshuIO] 第 {group_idx+1}/{len(groups)} 组: {group}", file=sys.stderr)
 
@@ -426,6 +456,11 @@ def execute_plan_graph(handler: YunshuCommandHandler, plan: PlanGraph) -> dict:
             resp = handler.spawn(node.agent_type, prompt, node_id=tid)
             print(f"[YunshuIO]   SPAWN {node.agent_type}({tid}): {resp[:80]}", file=sys.stderr)
 
+            # ── 推送 SPAWN 到聊天 ──
+            _push_progress(handler.conv_id,
+                f"🔄 {tid} {node.agent_type} 启动 — {node.description[:60]}...",
+                source=handler.source)
+
             # 记录映射 (spawn 返回 "OK <api_id>")
             if resp.startswith("OK "):
                 api_id = resp[3:].strip()
@@ -439,6 +474,18 @@ def execute_plan_graph(handler: YunshuCommandHandler, plan: PlanGraph) -> dict:
         # 步骤 2: wait_all 等待本组全部完成
         wait_output = handler.wait_all()
         print(f"[YunshuIO]   等待完成", file=sys.stderr)
+
+        # ── 推送节点完成到聊天 ──
+        for tid, node in group_nodes:
+            api_id = task_map.get(tid)
+            if api_id:
+                entry = handler.children.get(api_id, {})
+                obj = entry.get("obj", {}) if isinstance(entry, dict) else {}
+                status = obj.get("status", "UNKNOWN")
+                icon = "✅" if status in ("DONE",) else "❌"
+                _push_progress(handler.conv_id,
+                    f"{icon} {tid} {node.agent_type} 完成",
+                    source=handler.source)
 
         # 步骤 3: check 每个子任务结果
         for tid, node in group_nodes:
@@ -471,23 +518,313 @@ def execute_plan_graph(handler: YunshuCommandHandler, plan: PlanGraph) -> dict:
     return {"results": step_results, "summary": summary}
 
 
-def _collect_children_results(handler):
-    """从 handler.children 捞出所有子任务的完整结果"""
+def _strip_diff_wrapper(result_text):
+    """剥离 hermes chat diff 格式外壳，还原真实 Markdown 内容"""
+    if not result_text:
+        return result_text
+    text = result_text
+    # 1. 去掉 tirith 警告行
+    if "⚠ tirith" in text[:100]:
+        text = text.split("\n", 1)[1] if "\n" in text else text
+    # 2. 去掉 "┊ review diff" 头
+    if "┊ review diff" in text[:200]:
+        text = text.split("\n", 1)[1] if "\n" in text else text
+    # 3. 跳过 diff 元数据行（a/... → b/... / @@ ... @@ / --- / +++）
+    lines = text.split("\n")
+    cleaned = []
+    for line in lines:
+        s = line.strip()
+        if s.startswith(("a/", "b/")) or s.startswith("@@") or s == "---" or s.startswith("+++"):
+            continue
+        # 4. 去掉行首的 + 前缀（diff 新增行标记）
+        if line.startswith("+"):
+            line = line[1:]
+        cleaned.append(line)
+    return "\n".join(cleaned)
+
+
+def _extract_core_summary(result_text, max_chars=600):
+    """从子Agent产出的 Markdown 报告中提取核心结论（结构化摘要）"""
+    if not result_text:
+        return "(无输出)"
+    # 先剥离 diff 外壳
+    result_text = _strip_diff_wrapper(result_text)
+    if len(result_text) <= max_chars:
+        return result_text
+
+    # 提取 score 行、结论/建议/亮点/问题等关键段落
+    score_pattern = re.compile(r'(?:评分|分数|得分|Score)[：:]\s*.+', re.I)
+    section_pattern = re.compile(
+        r'^#{1,3}\s*(?:结论|建议|总结|汇总|亮点|问题|推荐|核心|摘要|审查'
+        r'|结论|方案|实施|代码质量|最终'
+        r'|Conclusion|Summary|Recommend|Key|Result)',
+        re.I | re.M
+    )
+
+    parts = []
+    # 开头（概览/范围）
+    parts.append(result_text[:200].strip())
+
+    # 评分行
+    for m in score_pattern.finditer(result_text):
+        parts.append(m.group().strip())
+
+    # 关键章节
+    for m in section_pattern.finditer(result_text):
+        start = m.start()
+        end = min(start + 300, len(result_text))
+        section_text = result_text[start:end].strip()
+        parts.append(section_text)
+
+    # 拼接并截断
+    summary = "\n".join(parts)
+    if len(summary) > max_chars:
+        # 优先保留评分和结论，从后往前裁
+        lines = summary.split("\n")
+        kept = []
+        remaining = max_chars
+        for line in reversed(lines):
+            if remaining <= 0:
+                break
+            if len(line) + 1 <= remaining:
+                kept.insert(0, line)
+                remaining -= len(line) + 1
+            else:
+                kept.insert(0, line[:remaining])
+                break
+        summary = "\n".join(kept)
+
+    return summary[:max_chars]
+
+
+def _summarize_children_results(handler, max_per_child=600):
+    """结构化摘要：每个子Agent结果只取核心结论，总量从 ~24000 降到 ~2000
+    过滤掉 RUNNING 状态和空结果的子任务，避免 LLM 混乱"""
     lines = []
     for tid, entry in handler.children.items():
         obj = entry.get("obj", {}) if isinstance(entry, dict) else {}
         agent = obj.get("agent_name", "?")
         status = obj.get("status", "UNKNOWN")
         result = obj.get("result", "") or ""
-        lines.append(f"[{agent}|{tid}] {status}:\n{result[:8000]}")
+        # 跳过 RUNNING 和空结果的子任务
+        if status in ("RUNNING",) or not result.strip():
+            lines.append(f"[{agent}|{tid}] {status}: (结果为空/未完成)")
+            continue
+        core = _extract_core_summary(result, max_per_child)
+        lines.append(f"[{agent}|{tid}] {status}:\n{core}")
     return "\n\n".join(lines) if lines else "无子任务"
+
+
+def _collect_children_results(handler):
+    """从 handler.children 捞出所有子任务的完整结果（保留兼容，内部调用摘要版）"""
+    return _summarize_children_results(handler, max_per_child=2000)
+
+
+def _looks_like_code_or_garbage(text):
+    """检测输出是否为代码/测试/诊断内容，而非正常的用户回复"""
+    if not text or len(text) < 10:
+        return False
+    text_stripped = text.strip()
+
+    # 1. 以代码块开头
+    if text_stripped.startswith("```"):
+        return True
+
+    # 2. 包含 review diff 模式
+    if "┊ review diff" in text_stripped or "review diff" in text_stripped[:200]:
+        return True
+
+    # 3. 以 unified diff 开头
+    if text_stripped.startswith("@@") or text_stripped.startswith("--- a/") or text_stripped.startswith("+++ b/"):
+        return True
+
+    # 4. 代码特征密度过高
+    code_indicators = [
+        "#!/usr/bin/env python", "import sys", "def test(", "def test_",
+        "PlanGraph.parse", "test(\"", 'print(f\'===', "sqlite3",
+    ]
+    code_hits = sum(1 for ci in code_indicators if ci in text_stripped)
+    if code_hits >= 2:
+        return True
+
+    # 5. 诊断报告模式（含 plan_parser / 根因 / 失败模式 等关键词）
+    diagnostic_keywords = ["诊断报告", "失败模式", "根因", "plan_parser", "PlanGraph.parse"]
+    diag_hits = sum(1 for dk in diagnostic_keywords if dk in text_stripped)
+    if diag_hits >= 2:
+        return True
+
+    # 6. 代码行占比过高（以 + / - 开头的行 > 30%）
+    lines = text_stripped.split("\n")
+    if len(lines) > 5:
+        diff_lines = sum(1 for l in lines if l.startswith("+") or l.startswith("-"))
+        if diff_lines > len(lines) * 0.3:
+            return True
+
+    return False
 
 
 # ══════ 主循环 v4 ══════
 
-def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
-    handler = YunshuCommandHandler(parent_id, conv_id, agent_profile)
+def classify_intent(user_message: str, conv_id: int) -> str:
+    """
+    轻量意图分类 — 单次 hermes 小调用，复用云枢当前模型
+    返回: "TASK" | "CHAT" | "CONTINUE"
+    失败兜底: 返回 "TASK"（走原有流程，零风险）
+    """
+    # ── 检查是否有未完成的任务上下文 ──
+    has_pending = False
+    try:
+        pending = requests.get(
+            f"{API_BASE}/api/parent-tasks/list/?conversation={conv_id}&status=PLANNING",
+            timeout=3
+        ).json()
+        if pending and len(pending) > 0:
+            has_pending = True
+    except Exception:
+        pass
+
+    pending_hint = ""
+    if has_pending:
+        pending_hint = "\n注意：此会话有未完成的任务，用户可能在继续追问。"
+
+    classify_prompt = f"""你是一个消息分类器。分析用户消息，只输出一个标签。
+
+标签定义：
+- TASK: 包含明确可执行指令。例如："帮我写一个爬虫""创建飞书文档""修复这个bug""分析这个数据"
+- CHAT: 纯问答/讨论/反馈/闲聊/追问。例如："为什么你的方案和云筑的相差这么大""这个想法怎么样""什么是XX""你觉得呢"
+- CONTINUE: 明确延续上一轮任务。例如："继续""刚才那个不对""换一个方案""再试一次"
+
+{pending_hint}
+
+用户消息：
+{user_message}
+
+只输出一个标签，不要解释："""
+
+    try:
+        result = subprocess.run(
+            ["hermes", "chat", "-q", classify_prompt, "-Q", "--yolo",
+             "-m", "deepseek-chat"],
+            capture_output=True, text=True, timeout=30,
+            cwd=os.path.expanduser("~"), stdin=subprocess.DEVNULL
+        )
+        raw = result.stdout.strip()
+        if raw.startswith("session_id:"):
+            raw = raw.split("\n", 1)[1].strip() if "\n" in raw else raw
+
+        for label in ["TASK", "CHAT", "CONTINUE"]:
+            if label in raw.upper():
+                return label
+
+        return "TASK"  # 兜底
+    except Exception as e:
+        print(f"[YunshuIO] classify_intent error: {e}", file=sys.stderr)
+        return "TASK"
+
+
+def _direct_chat_reply(user_message: str, system_prompt: str) -> str:
+    """
+    非任务类消息：直接回复，不派生子Agent
+    用精简的对话型 prompt，明确告知不要 PLAN
+    """
+    chat_prompt = f"""# 对话模式
+
+{system_prompt[:800]}
+
+你是云枢，一个 AI 助手。用户正在和你闲聊/讨论/提问，这不是一个需要执行的任务。
+
+## 规则
+- 用自然对话回复，Markdown 格式
+- 不要输出 PLAN、不要分派子任务
+- 不要说"我来帮你做XX"（没有任务要做）
+- 直接、简洁地回答
+
+用户消息：
+{user_message}"""
+
+    try:
+        result = subprocess.run(
+            ["hermes", "chat", "-q", chat_prompt, "-Q", "--yolo",
+             "-m", "deepseek-chat"],
+            capture_output=True, text=True, timeout=120,
+            cwd=os.path.expanduser("~"), stdin=subprocess.DEVNULL
+        )
+        raw = result.stdout.strip()
+        if raw.startswith("session_id:"):
+            raw = raw.split("\n", 1)[1].strip() if "\n" in raw else raw
+        return raw or "收到，我再想想怎么回答。"
+    except Exception as e:
+        print(f"[YunshuIO] direct_chat_reply error: {e}", file=sys.stderr)
+        return "抱歉，处理您的消息时出了点问题。"
+
+
+def _build_continue_context(conv_id: int) -> str:
+    """
+    查找上一轮的 PLAN 和子任务结果，构建继续上下文。
+    返回空字符串表示无法恢复上下文 → 降级为 TASK。
+    """
+    try:
+        prev_tasks = requests.get(
+            f"{API_BASE}/api/parent-tasks/list/?conversation={conv_id}&status=REPLY",
+            timeout=5
+        ).json()
+        if not prev_tasks:
+            return ""
+
+        last = prev_tasks[0]
+        task_id = last.get("id")
+
+        # 获取该任务的子任务结果
+        children = requests.get(
+            f"{API_BASE}/api/child-tasks/by-parent/{task_id}/",
+            timeout=5
+        ).json()
+
+        lines = [
+            f"上一条任务（#{task_id}）已完成。",
+            f"最终回复摘要：{last.get('final_reply', '')[:300]}",
+            ""
+        ]
+        for c in children:
+            agent = c.get("agent_name", "?")
+            status = c.get("status", "?")
+            result_preview = (c.get("result") or "")[:200]
+            lines.append(
+                f"- [{agent}] {status}: {result_preview}"
+            )
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni", source="web"):
+    handler = YunshuCommandHandler(parent_id, conv_id, agent_profile, source=source)
     system_prompt = _load_system_prompt()
+
+    # ══════════════════════════════════════════
+    # [新增] Step 0: 意图分类 — CHAT 直接回复，不走子Agent
+    # ══════════════════════════════════════════
+    intent = classify_intent(user_message, conv_id)
+    print(f"[YunshuIO] Intent: {intent}", file=__import__('sys').stderr)
+
+    if intent == "CHAT":
+        chat_reply = _direct_chat_reply(user_message, system_prompt)
+        requests.patch(
+            f"{API_BASE}/api/parent-tasks/{parent_id}/",
+            json={"status": "REPLY", "final_reply": chat_reply}, timeout=10
+        )
+        handler._cleanup()
+        return chat_reply
+
+    # ── CONTINUE 路径：构建上下文后降级为 TASK ──
+    continue_ctx = ""
+    if intent == "CONTINUE":
+        continue_ctx = _build_continue_context(conv_id)
+
+    # ══════════════════════════════════════════
+    # 以下为原有流程（TASK / CONTINUE降级）
+    # ══════════════════════════════════════════
 
     requests.patch(f"{API_BASE}/api/parent-tasks/{parent_id}/",
                    json={"status": "PLANNING"}, timeout=5)
@@ -505,18 +842,29 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
     except Exception:
         pass
 
-    context = f"{system_prompt}{prev_ctx}\n\n用户消息：{user_message}"
+    # [新增] CONTINUE 上下文注入
+    if continue_ctx:
+        context = (
+            f"{system_prompt}{prev_ctx}\n\n"
+            f"## 上轮上下文\n{continue_ctx}\n\n"
+            f"用户消息：{user_message}"
+        )
+    else:
+        context = f"{system_prompt}{prev_ctx}\n\n用户消息：{user_message}"
 
-    # 聚合跨端上下文（飞书 + Web）
+    # 聚合跨端上下文（飞书 + Web），作为额外上下文注入而非覆盖
     try:
         from context_aggregator import aggregate_cross_source_context
         cross_ctx = aggregate_cross_source_context(conv_id, user_message)
         if cross_ctx:
+            # 注意：追加在 system_prompt 之后、user_message 之前，不丢失 prev_ctx/continue_ctx
             context = (
-                f"{system_prompt}\n\n"
+                f"{system_prompt}{prev_ctx}\n\n"
                 f"{cross_ctx}\n\n"
-                f"用户消息：{user_message}"
             )
+            if continue_ctx:
+                context += f"## 上轮上下文\n{continue_ctx}\n\n"
+            context += f"用户消息：{user_message}"
     except Exception:
         pass
     max_rounds = 15
@@ -530,6 +878,16 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
 
         if not reply:
             break
+
+        # ═══ REPLY 阶段防护：如果当前上下文是最终回复，LLM 却输出 PLAN，
+        #      说明 LLM 混乱，直接 fallback ═══
+        _in_reply_phase = context.startswith("# 最终回复")
+        if _in_reply_phase and ("PLAN FAIL" in reply or "PLAN:" in reply[:200]):
+            import sys
+            print(f"[YunshuIO] ⚠️ REPLY阶段LLM输出PLAN（混乱），直接fallback", file=sys.stderr)
+            _push_progress(conv_id, "⚠️ 云枢响应异常，使用兜底回复", source=handler.source)
+            handler._cleanup()
+            return _fallback_reply(parent_id, conv_id, source=handler.source)
 
         lines = reply.strip().split("\n")
         response_lines = []
@@ -574,9 +932,14 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                         response = handler.kill(m.group(1))
                     elif cmd_name == "REPLY":
                         final = m.group(1).strip()
-                        handler.reply(final)
-                        handler._cleanup()
-                        return final
+                        err = handler.reply(final)
+                        if err and err.startswith("ERROR"):
+                            import sys
+                            print(f"[YunshuIO] ⚠️ REPLY命令出口校验拒绝: {final[:80]}", file=sys.stderr)
+                            # 不返回，让兜底逻辑处理
+                        else:
+                            handler._cleanup()
+                            return final
                     elif cmd_name == "PLAN":
                         in_plan = True
                         plan_lines = [m.group(1).strip()]
@@ -601,20 +964,49 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
             plan_graph = PlanGraph.parse(plan_text)  # 方案 B: 保存解析结果
             response_lines.append(handler.handle_plan(plan_text))
 
-        # 兜底：整轮无命令 → 整段当 REPLY
+        # 兜底：整轮无命令 → 跑偏检测 + 重试
         if not any_command:
-            handler.reply(reply.strip())
+            reply_text = reply.strip()
+            if _looks_like_code_or_garbage(reply_text):
+                import sys
+                print(f"[YunshuIO] ⚠️ 兜底检测：输出疑似代码/测试内容，重试一轮", file=sys.stderr)
+                retry_ctx = (
+                    f"# 紧急重试\n\n"
+                    f"刚才的输出不像是给用户的最终回复。\n\n"
+                    f"用户需求：{user_message[:300]}\n\n"
+                    f"请直接输出最终回复（Markdown格式），不要输出代码、测试、或诊断内容。"
+                )
+                retry_reply = _hermes_q(retry_ctx, agent_profile)
+                if retry_reply and not _looks_like_code_or_garbage(retry_reply):
+                    err = handler.reply(retry_reply.strip())
+                    if err and err.startswith("ERROR"):
+                        print(f"[YunshuIO] ⚠️ 重试后 reply() 拒绝: {err}", file=sys.stderr)
+                    else:
+                        handler._cleanup()
+                        return retry_reply.strip()
+                print(f"[YunshuIO] ⚠️ 重试仍跑偏，使用兜底回复", file=sys.stderr)
+                handler._cleanup()
+                return _fallback_reply(parent_id, conv_id, source=handler.source)
+            handler.reply(reply_text)
             handler._cleanup()
-            return reply.strip()
+            return reply_text
 
         # 构建下一轮 context
-        if response_lines or handler.reflect_state.passed:
+        if response_lines:
+            # ── PLAN FAIL（云枢判定无任务）→ 直接友好回复，不进入 REFLECT 循环 ──
+            if any("no_task" in r for r in response_lines):
+                reply = "您好！我是云枢调度器。请下发一个具体任务，我会协调 Banni（搜索/工程）、Basir（分析/推断）、云衡（测试/审查）三个子Agent为您服务。"
+                handler.reply(reply)
+                handler._cleanup()
+                return reply
+
             # ═══ 方案 B: PLAN 刚解析 → 代码接管执行 ═══
             if any("plan_parsed" in r for r in response_lines):
                 if plan_graph and plan_graph.validate():
                     # 代码按依赖图自动 spawn + wait + collect
                     exec_result = execute_plan_graph(handler, plan_graph)
                     results_text = _collect_children_results(handler)
+                    _push_progress(conv_id, "🔍 REFLECT 自检中...", source=handler.source)
                     context = (
                         f"# REFLECT 自检\n\n"
                         f"用户需求：{user_message[:300]}\n\n"
@@ -658,7 +1050,7 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                 )
                 # 反射轮次耗尽 → 强制结束
                 if handler.reflect_state.current_round >= handler.reflect_state.MAX_ROUNDS:
-                    _save_failed_reply(parent_id, conv_id, handler)
+                    _save_failed_reply(parent_id, conv_id, handler, source=handler.source)
                     break
 
             # SPAWN / WAIT → 子任务完成 → REFLECT
@@ -676,11 +1068,11 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
 
             # REFLECT 通过 → 构造 REPLY（不用 system_prompt，避免 PLAN 干扰）
             elif any("REFLECT_PASS" in r for r in response_lines):
-                results_text = handler.wait_all()
+                results_text = _summarize_children_results(handler, max_per_child=600)
                 context = (
                     f"# 最终回复\n\n"
                     f"用户需求：{user_message[:300]}\n\n"
-                    f"## 子任务结果\n{results_text}\n\n"
+                    f"## 子任务结果（核心摘要）\n{results_text}\n\n"
                     f"## 指令\n"
                     f"REFLECT 已通过。根据子任务结果和用户需求，"
                     f"立即 REPLY 输出最终回答（Markdown格式）。"
@@ -704,11 +1096,11 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
                     )
                 except Exception:
                     pass  # 记录失败不影响主流程
-            results_text = handler.wait_all()
+            results_text = _summarize_children_results(handler, max_per_child=600)
             context = (
                 f"# 最终回复\n\n"
                 f"用户需求：{user_message[:300]}\n\n"
-                f"## 子任务结果\n{results_text}\n\n"
+                f"## 子任务结果（核心摘要）\n{results_text}\n\n"
                 f"## 指令\n"
                 f"REFLECT 已通过。根据子任务结果和用户需求，"
                 f"立即 REPLY 输出最终回答（Markdown格式）。"
@@ -718,7 +1110,7 @@ def run_yunshu_session(parent_id, conv_id, user_message, agent_profile="banni"):
             break
 
     handler._cleanup()
-    return _fallback_reply(parent_id, conv_id)
+    return _fallback_reply(parent_id, conv_id, source=handler.source)
 
 
 def _hermes_q(message, profile):
@@ -757,7 +1149,7 @@ def _default_prompt():
 他们都有 feishu_doc/feishu_drive 工具，可以创建飞书云文档。
 
 ## ⚠️ 强制规则（违反规则的任务将被拒绝执行）
-- **任何需要子Agent的任务，第一轮只能输出 PLAN，禁止输出其他任何内容**
+- **收到任务时，第一轮只能输出 PLAN，禁止输出其他任何内容**
 - **严禁**在 PLAN 之前输出"已派发"、"正在执行"、"我来帮你"等自然语言
 - **严禁**跳过 PLAN 直接说"好的，我来安排"之类的话
 - 你的第一轮回复必须是且只能是 PLAN 格式，不能有任何前缀或后缀文字
@@ -788,12 +1180,12 @@ tasks:
 4. 通过后 REFLECT_PASS → REPLY 输出最终回答"""
 
 
-def _fallback_reply(parent_id, conv_id):
+def _fallback_reply(parent_id, conv_id, source="web"):
     reply = "系统在处理您的请求时遇到问题，请稍后重试。"
-    _save_failed_reply(parent_id, conv_id, None, reply)
+    _save_failed_reply(parent_id, conv_id, None, reply, source=source)
     return reply
 
-def _save_failed_reply(parent_id, conv_id, handler=None, reply=None):
+def _save_failed_reply(parent_id, conv_id, handler=None, reply=None, source="web"):
     """保存失败结果到数据库 + 写入会话消息"""
     if reply is None:
         reason = handler.reflect_state.fail_reason if handler else "未知错误"
@@ -810,10 +1202,10 @@ def _save_failed_reply(parent_id, conv_id, handler=None, reply=None):
     except Exception:
         pass
     try:
-        # 写入会话消息，让用户看到失败原因
+        # 写入会话消息，让用户看到失败原因（携带 source 以保留来源追踪）
         requests.post(
             f"{API_BASE}/api/messages/",
-            json={"conversation": conv_id, "role": "agent", "content": reply},
+            json={"conversation": conv_id, "role": "agent", "content": reply, "source": source},
             timeout=10
         )
     except Exception:

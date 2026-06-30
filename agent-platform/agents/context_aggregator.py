@@ -1,6 +1,11 @@
 """
 跨端上下文聚合器
 从 Django Message 表拉取所有 source 的最近消息，合并为统一上下文文本块。
+用于飞书↔Web 上下文同步：确保 Agent 在任意端都能感知到另一端的对话历史。
+
+v2 改进：
+  - 时间窗口从 120min 扩至 480min（8小时），覆盖更长对话
+  - 增加按 conversation+feishu_chat_id 跨端合并逻辑
 """
 from datetime import timedelta
 from django.utils import timezone
@@ -8,12 +13,13 @@ from .models import Message
 
 MAX_RECENT_MSGS = 20
 MAX_CONTEXT_CHARS = 4000
-TIME_WINDOW_MINUTES = 120
+TIME_WINDOW_MINUTES = 480  # 8小时，覆盖跨日对话
 
 SOURCE_LABELS = {
     "web":         "[Web端]",
     "feishu_chat": "[飞书群]",
     "feishu_bot":  "[飞书Bot]",
+    "feishu":      "[飞书]",
 }
 
 ROLE_LABELS = {

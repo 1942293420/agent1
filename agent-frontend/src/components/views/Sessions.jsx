@@ -127,7 +127,7 @@ export default function Sessions() {
   const agentRoles = {
     '豆角云枢': '决策中心 · 多Agent协同调度',
     '云枢': '决策中心 · 多Agent协同调度',
-    'Banni': '小温 · 飞书助手',
+    'Banni': '云筑 · 工程执行',
     'Basir': '范先生 · 主力Agent',
   };
   const agentRole = activeSession ? (agentRoles[activeSession.agent_name] || '') : '';

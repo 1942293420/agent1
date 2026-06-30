@@ -150,7 +150,7 @@ def process_message(msg_id):
     agent_profile = target.get("agent_profile", "banni")
 
     # ── Agent 路由：检查对话分配的 Agent ──
-    # 如果是 云衡，直接调 hermes chat，不走云枢调度
+    # 如果是 云衡/Banni/Basir，直接调 hermes chat，不走云枢调度
     try:
         conv_resp = requests.get(
             f"{AGENT_PLATFORM}/api/conversations/{conv_id}/", timeout=5
@@ -180,8 +180,11 @@ def process_message(msg_id):
             if reply.startswith("session_id:"):
                 reply = reply.split("\n", 1)[1].strip() if "\n" in reply else reply
             _save_reply(target, reply or "(无输出)")
+            _relay_feishu(target, reply or "(无输出)")
         except Exception as e:
-            _save_reply(target, f"{conv_agent}处理失败: {e}")
+            err_msg = f"{conv_agent}处理失败: {e}"
+            _save_reply(target, err_msg)
+            _relay_feishu(target, err_msg)
         _mark_processed(msg_id)
         return
 
@@ -197,13 +200,13 @@ def process_message(msg_id):
     _push_msg(conv_id, f"✅ 已收到，云枢调度中... (任务ID: {parent_id})", "received")
 
     # ── 文本协议：启动云枢，拦截命令 ──
-    final_reply = yunshu_io.run_yunshu_session(parent_id, conv_id, user_msg, agent_profile)
+    final_reply = yunshu_io.run_yunshu_session(parent_id, conv_id, user_msg, agent_profile, source=target.get("source", "web"))
 
     # 保存回复
     if final_reply:
         _save_reply(target, final_reply)
     _mark_processed(msg_id)
-    _relay_feishu(target)
+    _relay_feishu(target, final_reply or "(无输出)")
 
     elapsed = time.time() - start
     print(f"[Worker] #{msg_id} ({elapsed:.1f}s) parent={parent_id}")
@@ -237,12 +240,12 @@ def _mark_processed(msg_id):
                       json={"ids":[msg_id]}, timeout=10)
     except: pass
 
-def _relay_feishu(target):
+def _relay_feishu(target, reply):
     if target.get("source")!="feishu" or not target.get("feishu_chat_id"): return
     try:
         subprocess.run(["python3",
-            os.path.expanduser("~/.hermes/profiles/banni/scripts/relay_feishu.py"),
-            target["feishu_chat_id"], target.get("content","")],
+            "/home/jiangli/.hermes/profiles/banni/scripts/relay_feishu.py",
+            target["feishu_chat_id"], reply],
             capture_output=True,text=True,timeout=30)
     except: pass
 

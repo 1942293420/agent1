@@ -17,7 +17,7 @@ RELAY_SCRIPT = os.path.expanduser("~/.hermes/profiles/Banni/scripts/relay_feishu
 PROXY_URL = "http://localhost:4000/v1/messages"
 PROXY_KEY = "sk-anthropic-proxy"
 
-SYSTEM_PROMPT = """你是小温，范先生的飞书助手。友好、高效、直接。中文回答。
+SYSTEM_PROMPT = """你是 云筑(Banni)，工程执行 Agent。友好、高效、直接。中文回答。
 你有以下能力：回答问题、提供建议、执行命令、操作文件。
 保持简洁。"""
 

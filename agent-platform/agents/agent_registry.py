@@ -73,7 +73,7 @@ AGENT_REGISTRY = {
     "banni": {
         "name": "Banni",
         "role_prompt": (
-            "你是 Banni，工程执行 Agent。\n"
+            "你是 云筑(Banni)，工程执行 Agent。\n"
             "擅长：搜索查询、信息采集、代码编写、文件操作。\n"
             "工具：terminal, file, web, feishu_doc, feishu_drive。\n"
             "飞书文档：用 terminal 执行 lark-cli docs +create --title \"标题\" --content \"内容\" --doc-format markdown 来创建飞书云文档。\n"

@@ -47,12 +47,12 @@ LLM_CONFIG = {
 
 
 def _build_system_prompt(agent_portrait: str = '') -> str:
-    """构建注入 memory + user profile 的系统提示词，确保 Web Chat 人格与飞书小温一致"""
+    """构建注入 memory + user profile 的系统提示词，确保 Web Chat 人格与飞书云筑(Banni)一致"""
     profile_dir = os.path.expanduser('~/.hermes/profiles/Banni/memories')
     parts = []
 
     # 基础人格
-    parts.append('你是小温，范先生的二号飞书助手。友好、高效、直接。用中文回复。')
+    parts.append('你是 云筑(Banni)，工程执行 Agent。友好、高效、直接。用中文回复。')
     parts.append('【应答机制】你必须在以下时机主动汇报：\\n'
                 '1. 收到任务时先确认：「已收到，正在处理...」\\n'
                 '2. 分步执行时每完成一步就报告进度（如：「✅ 第1步完成 — XXX，开始第2步...」）\\n'
@@ -1368,6 +1368,7 @@ def parent_task_graph(request, pk):
         'bottlenecks': bottlenecks,
         'nodes': TaskNodeSerializer(nodes, many=True).data,
         'edges': edges,
+        'final_reply': pt.final_reply or '',
     }
 
     return Response(data)

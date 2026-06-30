@@ -83,7 +83,29 @@ export default function TaskGraph({ parentTaskId, onClose }) {
 
   if (loading) return <div className="task-graph-loading"><div className="graph-spinner" /><span>加载任务图...</span></div>;
   if (error) return <div className="task-graph-error">❌ {error} <button className="btn btn-ghost" onClick={fetchGraph}>重试</button></div>;
-  if (!layout) return <div className="task-graph-loading">无数据</div>;
+  if (!layout) return (
+    <div className="card" style={{ background: '#020617', border: '1px solid #1e293b', borderRadius: 12, overflow: 'hidden' }}>
+      <div className="card-header" style={{ borderBottom: '1px solid #1e293b', padding: '12px 18px' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#e8ecf1', fontFamily: 'var(--font-mono)' }}>
+          #{parentTaskId} · {graph?.parent_status || '?'}
+        </span>
+      </div>
+      <div style={{ padding: '40px 24px', textAlign: 'center', color: '#64748b' }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+        <div style={{ fontSize: 14, marginBottom: 4 }}>该任务暂无执行节点</div>
+        <div style={{ fontSize: 11, color: '#475569' }}>
+          {graph?.parent_status === 'PENDING' ? '任务尚未开始调度' :
+           graph?.parent_status === 'PLANNING' ? '云枢正在规划中...' :
+           '可能是纯对话任务（不是多Agent协作任务）'}
+        </div>
+        {graph?.parent_status === 'REPLY' && graph?.final_reply && (
+          <div style={{ marginTop: 16, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 8, textAlign: 'left', fontSize: 12, color: '#94a3b8', maxHeight: 200, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+            {graph.final_reply.slice(0, 500)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   const { layers, positions, edges, NODE_W, NODE_H, SVG_W, SVG_H } = layout;
   const total = graph.nodes.length;
