@@ -967,8 +967,8 @@ class MessageViewSet(viewsets.ModelViewSet):
             conv.title = message.content[:40] + ('...' if len(message.content) > 40 else '')
             conv.save(update_fields=['title'])
 
-        # 🎯 用户消息 → Redis 队列实时处理
-        if message.role == Message.Role.USER:
+        # 🎯 用户消息 → Redis 队列实时处理（跳过纯历史同步消息）
+        if message.role == Message.Role.USER and not message.processed:
             # 自动创建/更新任务记录
             try:
                 from agents.models import Task

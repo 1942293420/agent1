@@ -149,6 +149,9 @@ def process_message(msg_id):
     user_msg = target["content"]
     agent_profile = target.get("agent_profile", "banni")
 
+    # 🆕 Web→飞书 双向同步：消息来自 Web 且 conversation 有 feishu_chat_id 时，relay 用户消息到飞书
+    _relay_user_to_feishu(target, user_msg)
+
     # ── Agent 路由：检查对话分配的 Agent ──
     # 如果是 云衡/Banni/Basir，直接调 hermes chat，不走云枢调度
     try:
@@ -230,7 +233,7 @@ def _save_reply(target, reply):
     try:
         requests.post(f"{AGENT_PLATFORM}/api/messages/", json={
             "conversation":target["conversation_id"],"role":"agent",
-            "content":reply,"source":target.get("source","web"),"processed":True
+            "content":reply,"source":"web","processed":True
         }, timeout=10)
     except: pass
 
@@ -240,14 +243,30 @@ def _mark_processed(msg_id):
                       json={"ids":[msg_id]}, timeout=10)
     except: pass
 
-def _relay_feishu(target, reply):
-    if target.get("source")!="feishu" or not target.get("feishu_chat_id"): return
+def _relay_user_to_feishu(target, user_msg):
+    """Web→飞书：写入出站队列，由 Hook 发送"""
+    feishu_chat_id = target.get("feishu_chat_id")
+    if not feishu_chat_id or target.get("source") == "feishu":
+        return
     try:
         subprocess.run(["python3",
-            "/home/jiangli/.hermes/profiles/banni/scripts/relay_feishu.py",
-            target["feishu_chat_id"], reply],
-            capture_output=True,text=True,timeout=30)
+            "/home/jiangli/.hermes/profiles/banni/scripts/queue_feishu_outbound.py",
+            f"💬 [Web同步] {user_msg}"], timeout=5)
     except: pass
+
+def _relay_feishu(target, reply):
+    """Agent 回复 relay 到飞书"""
+    feishu_chat_id = target.get("feishu_chat_id")
+    if not feishu_chat_id:
+        return
+    try:
+        text = f"🤖 {reply[:500]}"
+        subprocess.run(["python3",
+            "/home/jiangli/.hermes/profiles/banni/scripts/relay_feishu.py", text],
+            timeout=15)
+        print(f"[Worker] _relay_feishu: sent", flush=True)
+    except Exception as e:
+        print(f"[Worker] _relay_feishu: error {e}", flush=True)
 
 
 # ══════ 主循环 ══════
