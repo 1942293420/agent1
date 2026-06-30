@@ -942,6 +942,24 @@ class MessageViewSet(viewsets.ModelViewSet):
     pagination_class = StandardPagination
 
     def perform_create(self, serializer):
+        # ── 飞书消息路由：按 feishu_chat_id 匹配已有 Conversation ──
+        feishu_chat_id = serializer.validated_data.pop('feishu_chat_id', None)
+        conversation = serializer.validated_data.get('conversation')
+
+        if feishu_chat_id and not conversation:
+            conv = Conversation.objects.filter(feishu_chat_id=feishu_chat_id).first()
+            if not conv:
+                conv = Conversation.objects.create(
+                    title='飞书对话',
+                    feishu_chat_id=feishu_chat_id,
+                    user=self.request.user if self.request.user.is_authenticated else None,
+                )
+            serializer.validated_data['conversation'] = conv
+
+        if not serializer.validated_data.get('conversation'):
+            from rest_framework import serializers as drf_serializers
+            raise drf_serializers.ValidationError({'conversation': '必须提供 conversation 或 feishu_chat_id'})
+
         message = serializer.save()
         conv = message.conversation
         # 用第一条用户消息更新对话标题

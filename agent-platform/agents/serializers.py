@@ -404,11 +404,16 @@ class CronJobSerializer(serializers.ModelSerializer):
 
 class MessageSerializer(serializers.ModelSerializer):
     role_label = serializers.CharField(source='get_role_display', read_only=True)
+    feishu_chat_id = serializers.CharField(write_only=True, required=False, allow_blank=True,
+        help_text='飞书会话ID：提供此字段时自动匹配或创建 Conversation')
 
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'role', 'role_label', 'content', 'task', 'processed', 'source', 'metadata', 'created_at']
+        fields = ['id', 'conversation', 'role', 'role_label', 'content', 'task', 'processed', 'source', 'metadata', 'created_at', 'feishu_chat_id']
         read_only_fields = ['id', 'created_at']
+        extra_kwargs = {
+            'conversation': {'required': False},
+        }
 
 
 class ConversationSerializer(serializers.ModelSerializer):
